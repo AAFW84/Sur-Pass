@@ -3312,6 +3312,32 @@ const entradasLiveSpan = document.querySelector('#entradasLive span');
 const salidasLiveSpan = document.querySelector('#salidasLive span');
 const miniChartDiv = document.getElementById('miniChart');
 
+// 🔧 NUEVA VARIABLE: Timestamp de última evacuación para el frontend
+window.TIMESTAMP_ULTIMA_EVACUACION = null;
+
+/**
+ * 🔧 NUEVA FUNCIÓN: Marcar que ocurrió una evacuación real
+ */
+function marcarEvacuacionRealOcurrida() {
+    window.TIMESTAMP_ULTIMA_EVACUACION = new Date().getTime();
+    console.log('🚨 Evacuación real marcada para actualización prioritaria de estadísticas');
+    
+    // Forzar actualización inmediata
+    setTimeout(() => {
+        updateStatsPanel();
+    }, 1000);
+    
+    // Actualizar cada 2 segundos por 5 minutos
+    const intervalPostEvacuacion = setInterval(() => {
+        updateStatsPanel();
+    }, 2000);
+    
+    setTimeout(() => {
+        clearInterval(intervalPostEvacuacion);
+        console.log('⏰ Fin del período de actualización post-evacuación');
+    }, 300000); // 5 minutos
+}
+
 function gestionarSonidos() {
     // Inicializar sonidos desde localStorage como fuente única de verdad
     let sonidosActivados = localStorage.getItem('surpass-sounds') !== 'false';
@@ -4618,12 +4644,20 @@ let actividadRecienteDetectada = false;
 function updateStatsPanel() {
     if (!mostrarEstadisticas) return;
 
+    // 🔧 DETECTAR SI ES POCO DESPUÉS DE UNA EVACUACIÓN REAL
+    const tiempoDesdeUltimaEvacuacion = window.TIMESTAMP_ULTIMA_EVACUACION ? 
+        (new Date().getTime() - window.TIMESTAMP_ULTIMA_EVACUACION) : Infinity;
+    const esPostEvacuacionReciente = tiempoDesdeUltimaEvacuacion < 60000; // 1 minuto
+
     // 🔧 NUEVO: Indicador visual de actualización
     const statsPanel = document.getElementById('statsPanel');
-    if (statsPanel) {
+    if (statsPanel && esPostEvacuacionReciente) {
         statsPanel.style.opacity = '0.8';
         statsPanel.style.borderColor = '#2196F3';
+        statsPanel.style.borderWidth = '2px';
     }
+
+    console.log(`📊 Actualizando estadísticas... ${esPostEvacuacionReciente ? '(POST-EVACUACIÓN RECIENTE)' : ''}`);
 
     google.script.run
         .withSuccessHandler(function(stats) {
@@ -4631,6 +4665,7 @@ function updateStatsPanel() {
             if (statsPanel) {
                 statsPanel.style.opacity = '1';
                 statsPanel.style.borderColor = '';
+                statsPanel.style.borderWidth = '';
             }
             
             // 🔧 MEJORADO: Validación más robusta de los datos
@@ -4639,7 +4674,7 @@ function updateStatsPanel() {
                 return;
             }
             
-            // 🔧 MEJORADO: Detectar cambios en las estadísticas con más precisión
+            // 🔧 DETECTAR CAMBIOS SIGNIFICATIVOS
             const huboActividad = 
                 stats.entradas !== ultimasEstadisticas.entradas || 
                 stats.salidas !== ultimasEstadisticas.salidas;
@@ -4652,19 +4687,31 @@ function updateStatsPanel() {
             if (hayInconsistencia) {
                 console.warn('⚠️ Datos inconsistentes detectados:', stats);
                 
-                // Intentar recuperar datos válidos
-                setTimeout(() => {
-                    console.log('🔄 Reintentando obtener estadísticas válidas...');
-                    updateStatsPanel();
-                }, 1000);
+                // Si es post-evacuación y hay inconsistencias, forzar actualización
+                if (esPostEvacuacionReciente) {
+                    console.log('🔄 Post-evacuación con datos inconsistentes, forzando actualización...');
+                    
+                    google.script.run
+                        .withSuccessHandler(function(actualizacionForzada) {
+                            if (actualizacionForzada.success) {
+                                console.log('✅ Actualización forzada exitosa:', actualizacionForzada);
+                                actualizarEstadisticasConDatos(actualizacionForzada.estadisticas);
+                            }
+                        })
+                        .withFailureHandler(function(error) {
+                            console.error('❌ Error en actualización forzada:', error);
+                        })
+                        .forzarActualizacionEstadisticasInmediata();
+                }
                 return;
             }
             
-            if (huboActividad && !actividadRecienteDetectada) {
-                console.log('🚨 Actividad detectada - Aumentando frecuencia de actualización');
+            // 🔧 DETECTAR ACTIVIDAD O POST-EVACUACIÓN
+            if ((huboActividad || esPostEvacuacionReciente) && !actividadRecienteDetectada) {
+                console.log(`🚨 ${esPostEvacuacionReciente ? 'POST-EVACUACIÓN' : 'ACTIVIDAD'} detectada - Aumentando frecuencia`);
                 actividadRecienteDetectada = true;
                 
-                // Aumentar frecuencia temporalmente (cada 1 segundo por 2 minutos)
+                // Aumentar frecuencia temporalmente (cada 1 segundo)
                 if (updateStatsInterval) {
                     clearInterval(updateStatsInterval);
                 }
@@ -4686,25 +4733,38 @@ function updateStatsPanel() {
             
             // 🔧 MEJORADO: Actualización visual con mejor feedback
             if (entradasLiveSpan) {
+                const valorAnterior = parseInt(entradasLiveSpan.textContent) || 0;
                 entradasLiveSpan.textContent = stats.entradas;
-            }
-            if (salidasLiveSpan) {
-                salidasLiveSpan.textContent = stats.salidas;
-            }
-
-            // Animación más prominente si hay actividad
-            const animationClass = huboActividad ? 'countUpActive' : 'countUp';
-            if (entradasLiveSpan) {
-                entradasLiveSpan.style.animation = `${animationClass} 0.5s ease`;
-            }
-            if (salidasLiveSpan) {
-                salidasLiveSpan.style.animation = `${animationClass} 0.5s ease`;
+                
+                // Animación especial si cambió después de evacuación
+                if (valorAnterior !== stats.entradas && esPostEvacuacionReciente) {
+                    entradasLiveSpan.style.animation = 'countUpActive 1s ease';
+                    entradasLiveSpan.style.fontWeight = 'bold';
+                    entradasLiveSpan.style.color = '#4CAF50';
+                    setTimeout(() => {
+                        entradasLiveSpan.style.animation = '';
+                        entradasLiveSpan.style.fontWeight = '';
+                        entradasLiveSpan.style.color = '';
+                    }, 1000);
+                }
             }
             
-            setTimeout(() => {
-                if (entradasLiveSpan) entradasLiveSpan.style.animation = '';
-                if (salidasLiveSpan) salidasLiveSpan.style.animation = '';
-            }, 500);
+            if (salidasLiveSpan) {
+                const valorAnterior = parseInt(salidasLiveSpan.textContent) || 0;
+                salidasLiveSpan.textContent = stats.salidas;
+                
+                // Animación especial si cambió después de evacuación
+                if (valorAnterior !== stats.salidas && esPostEvacuacionReciente) {
+                    salidasLiveSpan.style.animation = 'countUpActive 1s ease';
+                    salidasLiveSpan.style.fontWeight = 'bold';
+                    salidasLiveSpan.style.color = '#FF9800';
+                    setTimeout(() => {
+                        salidasLiveSpan.style.animation = '';
+                        salidasLiveSpan.style.fontWeight = '';
+                        salidasLiveSpan.style.color = '';
+                    }, 1000);
+                }
+            }
 
             // Gráfica
             drawMiniChart(stats.entradas, stats.salidas);
@@ -4715,22 +4775,26 @@ function updateStatsPanel() {
             }
             
             // 🔧 NUEVO: Log de timestamp para debugging
-            console.log(`📊 Estadísticas actualizadas: ${stats.entradas} entradas, ${stats.salidas} salidas [${new Date().toLocaleTimeString()}]`);
+            if (esPostEvacuacionReciente || huboActividad) {
+                console.log(`📊 Estadísticas actualizadas: ${stats.entradas} entradas, ${stats.salidas} salidas [${new Date().toLocaleTimeString()}]`);
+            }
         })
         .withFailureHandler(function(error) {
             // Restaurar apariencia del panel
             if (statsPanel) {
                 statsPanel.style.opacity = '1';
                 statsPanel.style.borderColor = '#ff5722';
+                statsPanel.style.borderWidth = '1px';
             }
             
             console.error('❌ Error al obtener estadísticas:', error);
             
-            // 🔧 NUEVO: Reintento automático en caso de error
+            // 🔧 NUEVO: Reintento más agresivo si es post-evacuación
+            const tiempoReintento = esPostEvacuacionReciente ? 2000 : 5000;
             setTimeout(() => {
                 console.log('🔄 Reintentando actualización de estadísticas...');
                 updateStatsPanel();
-            }, 5000); // Reintentar en 5 segundos
+            }, tiempoReintento);
         })
         .obtenerEstadisticas();
 }
@@ -5636,6 +5700,36 @@ function ejecutarEvacuacionConfirmada() {
                     ocultarLoadingEvacuacion();
                     if (resultado.success) {
                         showCustomNotification(`✅ Evacuación REAL completada: ${resultado.message}`, 'success');
+                        
+                        // 🔥 CRÍTICO: Verificar si fue evacuación real para forzar actualización
+                        if (resultado.tipo === 'real' && resultado.cacheInvalidado) {
+                            console.log('🚨 EVACUACIÓN REAL DETECTADA - Forzando actualización inmediata de estadísticas...');
+                            
+                            // Marcar evacuación real en el frontend
+                            marcarEvacuacionRealOcurrida();
+                            
+                            // Llamar a la función de actualización inmediata
+                            google.script.run
+                                .withSuccessHandler(function(actualizacion) {
+                                    console.log('✅ Estadísticas actualizadas después de evacuación real:', actualizacion);
+                                    
+                                    if (actualizacion.success) {
+                                        // Actualizar inmediatamente con los nuevos datos
+                                        actualizarEstadisticasConDatos(actualizacion.estadisticas);
+                                        
+                                        // Mostrar notificación de actualización
+                                        showCustomNotification(
+                                            `📊 Estadísticas actualizadas: ${actualizacion.estadisticas.entradas} entradas, ${actualizacion.estadisticas.salidas} salidas`,
+                                            'success'
+                                        );
+                                    }
+                                })
+                                .withFailureHandler(function(error) {
+                                    console.error('❌ Error forzando actualización post-evacuación:', error);
+                                    showCustomNotification('Error actualizando estadísticas después de evacuación', 'warning');
+                                })
+                                .forzarActualizacionEstadisticasInmediata();
+                        }
                         
                         // 🔥 ACTUALIZAR INMEDIATAMENTE LA INTERFAZ LOCAL
                         actualizarInterfazPostEvacuacionReal(personasSeleccionadasEvacuacion, resultado);

@@ -2348,6 +2348,20 @@
 
             // ✅ RESULTADO FINAL
             const tiempoTotal = new Date().getTime() - startTime;
+            // 🔧 CRÍTICO: Invalidar cache inmediatamente después de evacuación real
+            if (tipo === 'real') {
+                console.log('🔄 Evacuación real completada, invalidando estadísticas...');
+                CACHE_ESTADISTICAS_INVALIDADO = true;
+                TIMESTAMP_ULTIMA_EVACUACION = new Date().getTime();
+                
+                // Forzar múltiples flush para asegurar sincronización
+                SpreadsheetApp.flush();
+                Utilities.sleep(200);
+                SpreadsheetApp.flush();
+                
+                console.log('✅ Cache de estadísticas invalidado para recálculo inmediato');
+            }
+
             logError(`✅ Evacuación ${tipo} completada en ${tiempoTotal}ms`, 'INFO', { 
                 sessionId: sessionId, 
                 totalEvacuadas: resultadoProcesamiento.personasEvacuadas?.length || 0, 
@@ -2364,6 +2378,8 @@
                 // 🔧 NUEVOS CAMPOS PARA FRONTEND
                 requiereActualizacionUI: tipo === 'real', // El frontend debe actualizar estadísticas si es evacuación real
                 totalPersonasRestantes: personasDentroActualizadas.length,
+                cacheInvalidado: tipo === 'real', // Indicar si se invalidó el cache
+                timestampEvacuacion: TIMESTAMP_ULTIMA_EVACUACION,
                 estadisticasActualizadas: tipo === 'real' ? obtenerEstadisticasBasicas() : null,
                 timestampActualizacion: new Date().toISOString()
             };
@@ -2921,6 +2937,78 @@
                 error: error.message,
                 timestamp: new Date().toISOString(),
                 resumen: 'Error durante diagnóstico: ' + error.message
+            };
+        }
+    }
+
+    /**
+     * ✅ FUNCIÓN CRÍTICA: Forzar actualización inmediata de estadísticas después de evacuación
+     */
+    function forzarActualizacionEstadisticasInmediata() {
+        try {
+            console.log('🔄 Forzando actualización inmediata de estadísticas post-evacuación...');
+            
+            // 1. Invalidar cache inmediatamente
+            CACHE_ESTADISTICAS_INVALIDADO = true;
+            TIMESTAMP_ULTIMA_EVACUACION = new Date().getTime();
+            
+            // 2. Forzar flush múltiple con pausas
+            for (let i = 0; i < 3; i++) {
+                SpreadsheetApp.flush();
+                Utilities.sleep(300); // Pausa más larga para asegurar sincronización
+                console.log(`🔄 Flush ${i + 1}/3 completado`);
+            }
+            
+            // 3. Recalcular estadísticas inmediatamente
+            const estadisticasNuevas = obtenerEstadisticas();
+            
+            // 4. Recalcular datos de evacuación
+            const datosEvacuacion = getEvacuacionDataForClient();
+            
+            // 5. Preparar respuesta completa para el frontend
+            const resultado = {
+                success: true,
+                timestamp: new Date().toISOString(),
+                mensaje: 'Estadísticas actualizadas inmediatamente después de evacuación',
+                
+                // Estadísticas recalculadas
+                estadisticas: {
+                    entradas: estadisticasNuevas.entradas || 0,
+                    salidas: estadisticasNuevas.salidas || 0,
+                    total: estadisticasNuevas.total || 0,
+                    recentRecords: estadisticasNuevas.recentRecords || []
+                },
+                
+                // Estado de evacuación actualizado
+                evacuacion: {
+                    totalDentro: datosEvacuacion.totalDentro || 0,
+                    personasDentro: datosEvacuacion.personasDentro || []
+                },
+                
+                // Metadatos para el frontend
+                requiereRefreshUI: true,
+                cacheInvalidado: true,
+                flushsRealizados: 3,
+                timestampEvacuacion: TIMESTAMP_ULTIMA_EVACUACION
+            };
+            
+            console.log(`✅ Actualización inmediata completada:`);
+            console.log(`📊 Entradas: ${resultado.estadisticas.entradas}, Salidas: ${resultado.estadisticas.salidas}`);
+            console.log(`🏢 Personas dentro: ${resultado.evacuacion.totalDentro}`);
+            
+            return resultado;
+            
+        } catch (error) {
+            console.error('❌ Error en actualización inmediata:', error.message);
+            
+            return {
+                success: false,
+                timestamp: new Date().toISOString(),
+                mensaje: 'Error en actualización inmediata: ' + error.message,
+                estadisticas: { entradas: 0, salidas: 0, total: 0 },
+                evacuacion: { totalDentro: 0, personasDentro: [] },
+                requiereRefreshUI: true,
+                cacheInvalidado: false
             };
         }
     }
