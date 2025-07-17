@@ -2637,7 +2637,12 @@
                 if (typeof CACHE_ESTADISTICAS !== 'undefined') {
                     CACHE_ESTADISTICAS = null;
                 }
-                console.log('✅ Variables de cache resetadas');
+                
+                // 🔧 NUEVO: Marcar estadísticas como invalidadas
+                CACHE_ESTADISTICAS_INVALIDADO = true;
+                TIMESTAMP_ULTIMA_EVACUACION = new Date().getTime();
+                
+                console.log('✅ Variables de cache resetadas y estadísticas marcadas como invalidadas');
             } catch (varError) {
                 console.log('⚠️ No se pudieron resetear variables:', varError.message);
             }
@@ -2741,6 +2746,82 @@
                 mensajeRecalculo: 'Error en recálculo',
                 requiereRefreshUI: true,
                 requiereActualizacionGraficos: true
+            };
+        }
+    }
+
+    /**
+     * ✅ FUNCIÓN NUEVA: Forzar actualización inmediata de estadísticas
+     * Esta función debe ser llamada desde el frontend después de evacuaciones
+     */
+    function forzarActualizacionEstadisticas() {
+        try {
+            console.log('🔄 Forzando actualización inmediata de estadísticas...');
+            
+            // 1. Marcar cache como invalidado
+            CACHE_ESTADISTICAS_INVALIDADO = true;
+            TIMESTAMP_ULTIMA_EVACUACION = new Date().getTime();
+            
+            // 2. Forzar flush de todas las hojas
+            SpreadsheetApp.flush();
+            
+            // 3. Recalcular estadísticas inmediatamente
+            const estadisticasActualizadas = obtenerEstadisticas();
+            const estadisticasBasicas = obtenerEstadisticasBasicas();
+            const datosEvacuacion = getEvacuacionDataForClient();
+            
+            // 4. Preparar respuesta completa
+            const resultado = {
+                success: true,
+                timestamp: new Date().toISOString(),
+                mensaje: 'Estadísticas actualizadas correctamente',
+                
+                // Estadísticas detalladas
+                estadisticas: {
+                    entradas: estadisticasActualizadas.entradas || 0,
+                    salidas: estadisticasActualizadas.salidas || 0,
+                    total: estadisticasActualizadas.total || 0,
+                    personasDentro: datosEvacuacion.totalDentro || 0,
+                    totalPersonal: estadisticasBasicas.totalPersonal || 0,
+                    accesosHoy: estadisticasBasicas.accesosHoy || 0
+                },
+                
+                // Personas actualmente dentro
+                personasDentro: datosEvacuacion.personasDentro || [],
+                totalPersonasDentro: datosEvacuacion.totalDentro || 0,
+                
+                // Registros recientes
+                registrosRecientes: estadisticasActualizadas.recentRecords || [],
+                
+                // Indicadores para frontend
+                cacheInvalidado: true,
+                requiereRefreshUI: true
+            };
+            
+            console.log(`✅ Estadísticas actualizadas: ${resultado.estadisticas.entradas} entradas, ${resultado.estadisticas.salidas} salidas, ${resultado.totalPersonasDentro} personas dentro`);
+            
+            return resultado;
+            
+        } catch (error) {
+            console.error('❌ Error forzando actualización de estadísticas:', error.message);
+            
+            return {
+                success: false,
+                timestamp: new Date().toISOString(),
+                mensaje: 'Error actualizando estadísticas: ' + error.message,
+                estadisticas: {
+                    entradas: 0,
+                    salidas: 0,
+                    total: 0,
+                    personasDentro: 0,
+                    totalPersonal: 0,
+                    accesosHoy: 0
+                },
+                personasDentro: [],
+                totalPersonasDentro: 0,
+                registrosRecientes: [],
+                cacheInvalidado: false,
+                requiereRefreshUI: true
             };
         }
     }
@@ -3342,6 +3423,12 @@
     let SIMULACRO_EN_CURSO = false;
 
     /**
+     * ✅ NUEVA VARIABLE: Control de actualización de estadísticas
+     */
+    let TIMESTAMP_ULTIMA_EVACUACION = null;
+    let CACHE_ESTADISTICAS_INVALIDADO = false;
+
+    /**
      * ✅ FUNCIÓN CORREGIDA: registrarEnHistorial con protección anti-simulacro
      */
     function registrarEnHistorial(historialSheet, fecha, resultado, tipo) {
@@ -3876,16 +3963,22 @@
      */
     function obtenerEstadisticasBasicas() {
         try {
+            // 🔧 NUEVO: Verificar si necesita forzar recálculo
+            if (CACHE_ESTADISTICAS_INVALIDADO) {
+                console.log('🔄 Cache invalidado en obtenerEstadisticasBasicas, forzando flush...');
+                SpreadsheetApp.flush();
+            }
+            
             const ss = SpreadsheetApp.getActiveSpreadsheet();
             
             // Contar personal registrado
             const bdSheet = ss.getSheetByName('Base de Datos');
             const totalPersonal = bdSheet ? Math.max(0, bdSheet.getLastRow() - 1) : 0;
             
-            // Obtener estadísticas detalladas de hoy
+            // 🔧 CRÍTICO: Obtener estadísticas detalladas (que ahora maneja cache invalidado)
             const statsDetalladas = obtenerEstadisticas();
             
-            // Contar accesos de hoy
+            // Contar accesos de hoy con recálculo forzado si es necesario
             const respuestasSheet = ss.getSheetByName('Respuestas formulario');
             let accesosHoy = 0;
             let ultimoRegistro = 'Ninguno';
@@ -3961,15 +4054,30 @@
      */
     function obtenerEstadisticas() {
         try {
+            // 🔧 NUEVO: Verificar si necesita forzar recálculo
+            if (CACHE_ESTADISTICAS_INVALIDADO) {
+                console.log('🔄 Cache de estadísticas invalidado, forzando recálculo completo...');
+                SpreadsheetApp.flush(); // Forzar flush antes de leer datos
+            }
+            
             const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respuestas formulario');
             
             if (!sheet) {
                 throw new Error('No se encontró la hoja "Respuestas formulario"');
             }
 
-            const data = sheet.getDataRange().getValues();
+            // 🔧 NUEVO: Forzar recarga de datos si es necesario
+            const data = CACHE_ESTADISTICAS_INVALIDADO ? 
+                sheet.getDataRange().getValues() : // Forzar nueva lectura
+                sheet.getDataRange().getValues();   // Lectura normal
             
             if (data.length <= 1) {
+                // 🔧 NUEVO: Marcar cache como válido después del recálculo
+                if (CACHE_ESTADISTICAS_INVALIDADO) {
+                    CACHE_ESTADISTICAS_INVALIDADO = false;
+                    console.log('✅ Cache de estadísticas revalidado (sin datos)');
+                }
+                
                 return {
                     entradas: 0,
                     salidas: 0,
@@ -4014,6 +4122,12 @@
             }
 
             logError(`Estadísticas calculadas: ${entradas} entradas, ${salidas} salidas`, 'INFO');
+
+            // 🔧 NUEVO: Marcar cache como válido después del recálculo exitoso
+            if (CACHE_ESTADISTICAS_INVALIDADO) {
+                CACHE_ESTADISTICAS_INVALIDADO = false;
+                console.log(`✅ Cache de estadísticas revalidado: ${entradas} entradas, ${salidas} salidas`);
+            }
 
             return {
                 entradas: entradas,

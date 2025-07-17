@@ -1312,33 +1312,33 @@
             google.script.run
                 .withSuccessHandler(function(estado) {
                     if (estado.success) {
-                        console.log('✅ Estado actualizado:', estado);
+                        console.log('✅ Estadísticas actualizadas:', estado);
                         
-                        // Actualizar elementos de la UI
+                        // Actualizar elementos de la UI con nuevas estadísticas
                         if (document.getElementById('evacuationStatus')) {
                             document.getElementById('evacuationStatus').textContent = 
                                 `Actualizada - ${estado.totalPersonasDentro} personas dentro`;
                         }
                         
-                        // Mostrar notificación con el estado actualizado
+                        // Mostrar notificación con estadísticas actualizadas
                         mostrarNotificacion(
-                            `Estado actualizado: ${estado.totalPersonasDentro} personas dentro del edificio`,
+                            `Estadísticas actualizadas: ${estado.estadisticas.entradas} entradas, ${estado.estadisticas.salidas} salidas, ${estado.totalPersonasDentro} personas dentro`,
                             'success'
                         );
                         
-                        // Si existe un elemento para mostrar estadísticas, actualizarlo
+                        // Actualizar display con estadísticas completas
                         actualizarDisplayEstadisticas(estado);
                         
                     } else {
-                        console.error('❌ Error actualizando estado:', estado.mensaje);
-                        mostrarNotificacion('Error actualizando estado: ' + estado.mensaje, 'error');
+                        console.error('❌ Error actualizando estadísticas:', estado.mensaje);
+                        mostrarNotificacion('Error actualizando estadísticas: ' + estado.mensaje, 'error');
                     }
                 })
                 .withFailureHandler(function(error) {
-                    console.error('❌ Error en actualización:', error);
-                    mostrarNotificacion('Error en actualización post-evacuación: ' + error.message, 'error');
+                    console.error('❌ Error en actualización de estadísticas:', error);
+                    mostrarNotificacion('Error en actualización de estadísticas: ' + error.message, 'error');
                 })
-                .obtenerEstadoActualizadoPostEvacuacion();
+                .forzarActualizacionEstadisticas(); // 🔧 NUEVA FUNCIÓN
         }
 
         // =====================================================
@@ -1346,32 +1346,72 @@
         // =====================================================
         function actualizarDisplayEstadisticas(estado) {
             try {
+                // 🔧 MEJORADO: Usar las nuevas estadísticas detalladas
+                const estadisticas = estado.estadisticas || {};
+                
                 // Actualizar contadores si existen en la UI
                 const elementos = {
-                    'totalPersonasDentro': estado.totalPersonasDentro,
-                    'totalEntradas': estado.estadisticas?.entradas,
-                    'totalSalidas': estado.estadisticas?.salidas,
-                    'totalAccesos': estado.estadisticas?.totalAccesos
+                    'totalPersonasDentro': estado.totalPersonasDentro || 0,
+                    'totalEntradas': estadisticas.entradas || 0,
+                    'totalSalidas': estadisticas.salidas || 0,
+                    'totalAccesos': estadisticas.total || 0,
+                    'totalPersonal': estadisticas.totalPersonal || 0,
+                    'accesosHoy': estadisticas.accesosHoy || 0
                 };
+                
+                console.log('🔄 Actualizando elementos UI:', elementos);
                 
                 Object.keys(elementos).forEach(elementId => {
                     const elemento = document.getElementById(elementId);
                     if (elemento && elementos[elementId] !== undefined) {
+                        const valorAnterior = elemento.textContent;
                         elemento.textContent = elementos[elementId];
                         
-                        // Agregar efecto visual de actualización
-                        elemento.style.backgroundColor = '#4CAF50';
+                        // Agregar efecto visual de actualización solo si cambió
+                        if (valorAnterior !== String(elementos[elementId])) {
+                            elemento.style.backgroundColor = '#4CAF50';
+                            elemento.style.color = 'white';
+                            elemento.style.transition = 'all 0.3s ease';
+                            elemento.style.fontWeight = 'bold';
+                            
+                            setTimeout(() => {
+                                elemento.style.backgroundColor = '';
+                                elemento.style.color = '';
+                                elemento.style.fontWeight = '';
+                            }, 2000);
+                        }
+                    }
+                });
+                
+                // 🔧 NUEVO: Actualizar elementos específicos de evacuación
+                const evacuationElements = {
+                    'personasDentroCount': estado.totalPersonasDentro,
+                    'entradasCount': estadisticas.entradas,
+                    'salidasCount': estadisticas.salidas
+                };
+                
+                Object.keys(evacuationElements).forEach(elementId => {
+                    const elemento = document.getElementById(elementId);
+                    if (elemento) {
+                        elemento.textContent = evacuationElements[elementId] || 0;
+                        
+                        // Efecto visual especial para cambios importantes
+                        elemento.style.backgroundColor = '#ff9800';
                         elemento.style.color = 'white';
-                        elemento.style.transition = 'all 0.3s ease';
+                        elemento.style.padding = '4px 8px';
+                        elemento.style.borderRadius = '4px';
+                        elemento.style.transition = 'all 0.5s ease';
                         
                         setTimeout(() => {
                             elemento.style.backgroundColor = '';
                             elemento.style.color = '';
-                        }, 2000);
+                            elemento.style.padding = '';
+                            elemento.style.borderRadius = '';
+                        }, 3000);
                     }
                 });
                 
-                console.log('✅ Display de estadísticas actualizado');
+                console.log('✅ Display de estadísticas actualizado con nuevos valores');
                 
             } catch (error) {
                 console.error('❌ Error actualizando display:', error);
