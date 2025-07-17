@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SurPass - Administración</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Colores base modernos */
+            --primary-gradient: linear-gradient(135deg, #960018 0%, #C41E3A 100%);
+            --secondary-gradient: linear-gradient(135deg, #43a047 0%, #66BB6A 100%);
+            --accent-gradient: linear-gradient(135deg, #FFD700 0%, #FFC107 100%);
+            --background-gradient: linear-gradient(135deg, #FBD10D 0%, #FFEB3B 100%);
+            --danger-gradient: linear-gradient(135deg, #f44336 0%, #e53935 100%);
+            --warning-gradient: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            
+            /* Efectos glassmorphism */
+            --glass-bg: rgba(255, 255, 255, 0.15);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            
+            /* Colores de texto y superficie */
+            --text-primary: #1a1a1a;
+            --text-secondary: #4a4a4a;
+            --text-muted: #9ca3af;
+            --surface: rgba(255, 255, 255, 0.95);
+            --surface-elevated: rgba(255, 255, 255, 0.98);
+            
+            /* Sombras */
+            --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            
+            /* Transiciones */
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            
+            /* Radios */
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            
+            /* Variables para tema oscuro */
+            --dark-primary-gradient: linear-gradient(135deg, #B71C1C 0%, #E53935 100%);
+            --dark-secondary-gradient: linear-gradient(135deg, #2e7d32 0%, #4CAF50 100%);
+            --dark-accent-gradient: linear-gradient(135deg, #FFC107 0%, #FFD54F 100%);
+            --dark-background-gradient: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            --dark-glass-bg: rgba(255, 255, 255, 0.05);
+            --dark-glass-border: rgba(255, 255, 255, 0.1);
+            --dark-text-primary: #f8fafc;
+            --dark-text-secondary: #e2e8f0;
+            --dark-text-muted: #64748b;
+            --dark-surface: rgba(30, 30, 30, 0.95);
+            --dark-surface-elevated: rgba(40, 40, 40, 0.98);
+            --dark-shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+            --dark-shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+            --dark-shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+            --dark-shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--background-gradient);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            transition: var(--transition);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body.dark-theme {
+            background: var(--dark-background-gradient);
+            color: var(--dark-text-primary);
+        }
+
+        .container {
+            min-height: 100vh;
+            padding: clamp(16px, 3vw, 32px);
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: clamp(24px, 5vw, 48px);
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            margin-bottom: clamp(20px, 4vw, 32px);
+            box-shadow: var(--shadow-xl);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--primary-gradient);
+            opacity: 0.9;
+            z-index: -1;
+        }
+
+        .dark-theme .header {
+            background: var(--dark-glass-bg);
+            border-color: var(--dark-glass-border);
+        }
+
+        .dark-theme .header::before {
+            background: var(--dark-primary-gradient);
+        }
+
+        h1 {
+            font-size: clamp(32px, 6vw, 48px);
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: clamp(16px, 3vw, 20px);
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+
+        #themeToggleButton {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 48px;
+            height: 48px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            font-size: 18px;
+        }
+
+        #themeToggleButton:hover {
+            transform: scale(1.1) rotate(180deg);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Main Content */
+        .main-content {
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: clamp(24px, 5vw, 48px);
+            box-shadow: var(--shadow-xl);
+            margin-bottom: 24px;
+        }
+
+        .dark-theme .main-content {
+            background: var(--dark-surface);
+            border-color: var(--dark-glass-border);
+        }
+
+        /* Navegación de pestañas */
+        .tabs-nav {
+            display: flex;
+            justify-content: center;
+            border-bottom: 2px solid var(--glass-border);
+            margin-bottom: 32px;
+            overflow-x: auto;
+            gap: 4px;
+        }
+
+        .dark-theme .tabs-nav {
+            border-bottom-color: var(--dark-glass-border);
+        }
+
+        .tab-button {
+            padding: 16px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: var(--radius-md) var(--radius-md) 0 0;
+            transition: var(--transition);
+            white-space: nowrap;
+            position: relative;
+            min-width: 120px;
+        }
+
+        .tab-button:hover {
+            background: var(--glass-bg);
+            color: var(--text-primary);
+        }
+
+        .tab-button.active {
+            background: var(--primary-gradient);
+            color: white;
+            box-shadow: var(--shadow-md);
+        }
+
+        .dark-theme .tab-button {
+            color: var(--dark-text-secondary);
+        }
+
+        .dark-theme .tab-button:hover {
+            background: var(--dark-glass-bg);
+            color: var(--dark-text-primary);
+        }
+
+        .dark-theme .tab-button.active {
+            background: var(--dark-primary-gradient);
+        }
+
+        /* Contenido de pestañas */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-md);
+            transition: var(--transition);
+        }
+
+        .dark-theme .card {
+            background: var(--dark-glass-bg);
+            border-color: var(--dark-glass-border);
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card h2 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .dark-theme .card h2 {
+            background: var(--dark-primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .dark-theme .card h3 {
+            color: var(--dark-text-primary);
+        }
+
+        /* Formularios */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .form-section {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .dark-theme .form-section {
+            background: var(--dark-glass-bg);
+            border-color: var(--dark-glass-border);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .dark-theme .input-group label {
+            color: var(--dark-text-secondary);
+        }
+
+        .input-group input,
+        .input-group select,
+        .input-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid transparent;
+            border-radius: var(--radius-md);
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            transition: var(--transition);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .dark-theme .input-group input,
+        .dark-theme .input-group select,
+        .dark-theme .input-group textarea {
+            background: var(--dark-glass-bg);
+            color: var(--dark-text-primary);
+        }
+
+        .input-group input:focus,
+        .input-group select:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #43a047;
+            box-shadow: 0 0 0 4px rgba(67, 160, 71, 0.1), var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .input-group input::placeholder,
+        .input-group textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        .dark-theme .input-group input::placeholder,
+        .dark-theme .input-group textarea::placeholder {
+            color: var(--dark-text-muted);
+        }
+
+        /* Botones */
+        .action-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .action-button:hover::before {
+            left: 100%;
+        }
+
+        .action-button:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .primary-button {
+            background: var(--primary-gradient);
+            color: white;
+        }
+
+        .secondary-button {
+            background: var(--secondary-gradient);
+            color: white;
+        }
+
+        .accent-button {
+            background: var(--accent-gradient);
+            color: var(--text-primary);
+        }
+
+        .danger-button {
+            background: var(--danger-gradient);
+            color: white;
+        }
+
+        .dark-theme .primary-button {
+            background: var(--dark-primary-gradient);
+        }
+
+        .dark-theme .secondary-button {
+            background: var(--dark-secondary-gradient);
+        }
+
+        .dark-theme .accent-button {
+            background: var(--dark-accent-gradient);
+            color: var(--dark-text-primary);
+        }
+
+        /* Loader */
+        #loaderOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 1000;
+            display: none;
+        }
+
+        .spinner {
+            border: 8px solid rgba(255, 255, 255, 0.1);
+            border-top: 8px solid var(--accent-gradient);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #loaderText {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Notificaciones */
+        #notificationContainer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .notification-item {
+            background: var(--secondary-gradient);
+            color: white;
+            padding: 16px 24px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            min-width: 300px;
+            font-weight: 500;
+            opacity: 0;
+            transform: translateX(100px);
+            animation: slideIn 0.3s ease-out forwards;
+        }
+
+        .notification-item.error {
+            background: var(--danger-gradient);
+        }
+
+        .notification-item.warning {
+            background: var(--warning-gradient);
+        }
+
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Estados de evacuación */
+        .evacuation-status {
+            text-align: center;
+            padding: 24px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            margin-top: 24px;
+        }
+
+        .dark-theme .evacuation-status {
+            background: var(--dark-glass-bg);
+            border-color: var(--dark-glass-border);
+        }
+
+        .evacuation-status h3 {
+            color: var(--warning-gradient);
+            margin-bottom: 8px;
+        }
+
+        #evacuationStatus {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .dark-theme #evacuationStatus {
+            color: var(--dark-text-primary);
+        }
+
+        /* Opciones de evacuación */
+        .evacuation-options {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 32px;
+            margin-bottom: 24px;
+            padding: 20px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+        }
+
+        .dark-theme .evacuation-options {
+            background: var(--dark-glass-bg);
+            border-color: var(--dark-glass-border);
+        }
+
+        .evacuation-options label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-primary);
+            transition: var(--transition);
+        }
+
+        .dark-theme .evacuation-options label {
+            color: var(--dark-text-primary);
+        }
+
+        .evacuation-options input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #43a047;
+        }
+
+        /* Placeholders para futuras funcionalidades */
+        .future-feature {
+            text-align: center;
+            padding: 48px 24px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            margin-top: 24px;
+        }
+
+        .dark-theme .future-feature {
+            background: var(--dark-glass-bg);
+            border-color: var(--dark-glass-border);
+        }
+
+        .future-feature i {
+            font-size: 64px;
+            margin-bottom: 24px;
+            opacity: 0.6;
+        }
+
+        .future-feature h3 {
+            font-size: 24px;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .dark-theme .future-feature h3 {
+            color: var(--dark-text-primary);
+        }
+
+        .future-feature p {
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .dark-theme .future-feature p {
+            color: var(--dark-text-secondary);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .tabs-nav {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .tab-button {
+                min-width: 100px;
+                padding: 12px 16px;
+                font-size: 12px;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .evacuation-options {
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            #themeToggleButton {
+                top: 16px;
+                right: 16px;
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+
+            .notification-item {
+                min-width: 250px;
+                margin-right: 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 12px;
+            }
+
+            .main-content {
+                padding: 16px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            .form-section {
+                padding: 16px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .header p {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Loader Overlay -->
+    <div id="loaderOverlay">
+        <div class="spinner"></div>
+        <p id="loaderText">Cargando...</p>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notificationContainer"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>
+                <i class="fas fa-user-shield"></i> SurPass - Panel de Administración
+            </h1>
+            <p>Gestión completa del sistema de control de acceso y evacuación</p>
+            <button id="themeToggleButton">
+                <i class="fas fa-moon"></i>
+            </button>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Tabs Navigation -->
+            <nav class="tabs-nav">
+                <button class="tab-button active" data-tab="gestion-personas">
+                    <i class="fas fa-users"></i> Gestión de Personas
+                </button>
+                <button class="tab-button" data-tab="evacuacion">
+                    <i class="fas fa-exclamation-triangle"></i> Evacuación
+                </button>
+                <button class="tab-button" data-tab="configuracion">
+                    <i class="fas fa-cogs"></i> Configuración
+                </button>
+                <button class="tab-button" data-tab="reportes">
+                    <i class="fas fa-chart-bar"></i> Reportes
+                </button>
+                <button class="tab-button" data-tab="gestion-areas">
+                    <i class="fas fa-map-marked-alt"></i> Áreas
+                </button>
+                <button class="tab-button" data-tab="visitas">
+                    <i class="fas fa-calendar-check"></i> Visitas
+                </button>
+                <button class="tab-button" data-tab="auditoria">
+                    <i class="fas fa-clipboard-list"></i> Auditoría
+                </button>
+            </nav>
+
+            <!-- Tab Content: Gestión de Personas -->
+            <div id="gestion-personas" class="tab-content active">
+                <div class="card">
+                    <h2>Gestión de Personas</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 32px;">Administra la base de datos de personal con información completa.</p>
+
+                    <div class="form-grid">
+                        <!-- Agregar/Actualizar Persona -->
+                        <div class="form-section">
+                            <h3>Agregar/Actualizar Persona</h3>
+                            <form id="personaForm">
+                                <div class="input-group">
+                                    <label for="cedula">Cédula:</label>
+                                    <input type="text" id="cedula" name="cedula" placeholder="Ej: 8-888-888" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="nombre">Nombre Completo:</label>
+                                    <input type="text" id="nombre" name="nombre" placeholder="Ej: Juan Pérez" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="telefono">Teléfono:</label>
+                                    <input type="tel" id="telefono" name="telefono" placeholder="Ej: 6666-6666">
+                                </div>
+                                <div class="input-group">
+                                    <label for="email">Email:</label>
+                                    <input type="email" id="email" name="email" placeholder="Ej: correo@ejemplo.com">
+                                </div>
+                                <div class="input-group">
+                                    <label for="departamento">Departamento:</label>
+                                    <input type="text" id="departamento" name="departamento" placeholder="Ej: Ventas">
+                                </div>
+                                <div class="input-group">
+                                    <label for="cargo">Cargo:</label>
+                                    <input type="text" id="cargo" name="cargo" placeholder="Ej: Gerente">
+                                </div>
+                                <div class="input-group">
+                                    <label for="estado">Estado:</label>
+                                    <select id="estado" name="estado">
+                                        <option value="Activo">Activo</option>
+                                        <option value="Inactivo">Inactivo</option>
+                                        <option value="Dentro">Dentro</option>
+                                        <option value="Fuera">Fuera</option>
+                                        <option value="Evacuado">Evacuado</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="notas">Notas:</label>
+                                    <textarea id="notas" name="notas" rows="3" placeholder="Notas adicionales"></textarea>
+                                </div>
+                                <button type="submit" class="action-button primary-button" style="width: 100%;">
+                                    <i class="fas fa-user-plus"></i> Guardar Persona
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Eliminar Persona -->
+                        <div class="form-section">
+                            <h3>Eliminar Persona</h3>
+                            <form id="eliminarPersonaForm">
+                                <div class="input-group">
+                                    <label for="cedulaEliminar">Cédula a Eliminar:</label>
+                                    <input type="text" id="cedulaEliminar" name="cedulaEliminar" placeholder="Ej: 8-888-888" required>
+                                </div>
+                                <button type="submit" class="action-button danger-button" style="width: 100%;">
+                                    <i class="fas fa-user-times"></i> Eliminar Persona
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Exportar Datos -->
+                    <div style="text-align: center; margin-top: 32px;">
+                        <h3>Exportar Base de Datos</h3>
+                        <button id="exportarDatosBtn" class="action-button accent-button" style="margin-top: 16px;">
+                            <i class="fas fa-file-export"></i> Exportar Datos a Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content: Evacuación -->
+            <div id="evacuacion" class="tab-content">
+                <div class="card">
+                    <h2>Control de Evacuación</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 32px;">Gestiona el estado de evacuación de las instalaciones.</p>
+
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 24px;">
+                        <!-- Opciones de Evacuación -->
+                        <div class="evacuation-options">
+                            <label>
+                                <input type="radio" id="realEvacuation" name="evacuationType" value="real" checked>
+                                <span>Evacuación Real</span>
+                            </label>
+                            <label>
+                                <input type="radio" id="drillEvacuation" name="evacuationType" value="simulacro">
+                                <span>Simulacro</span>
+                            </label>
+                        </div>
+
+                        <!-- Notas del Simulacro -->
+                        <div style="width: 100%; max-width: 500px; display: none;" id="simulacroNotasContainer">
+                            <div class="input-group">
+                                <label for="simulacroNotas">Notas del Simulacro:</label>
+                                <textarea id="simulacroNotas" rows="3" placeholder="Ej: Simulacro de incendio en sector A, falla en alarma."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Botones de Control -->
+                        <div style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;">
+                            <button id="iniciarEvacuacionBtn" class="action-button primary-button">
+                                <i class="fas fa-bell"></i> Iniciar Evacuación
+                            </button>
+                            <button id="finalizarEvacuacionBtn" class="action-button secondary-button">
+                                <i class="fas fa-check-circle"></i> Finalizar Evacuación
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Estado de Evacuación -->
+                    <div class="evacuation-status">
+                        <h3>Estado Actual de Evacuación</h3>
+                        <p id="evacuationStatus">Desconocido</p>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                            Este estado se actualiza al iniciar/finalizar una evacuación real.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content: Configuración -->
+            <div id="configuracion" class="tab-content">
+                <div class="card">
+                    <h2>Configuración del Sistema</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 32px;">Ajusta los parámetros de operación de SurPass.</p>
+
+                    <form id="configForm">
+                        <div class="form-grid">
+                            <!-- Sección de Horarios -->
+                            <div class="form-section">
+                                <h3>Horarios de Operación</h3>
+                                <div class="input-group">
+                                    <label style="display: flex; align-items: center; gap: 8px;">
+                                        <input type="checkbox" id="modo24Horas" name="MODO_24_HORAS">
+                                        Operación 24 Horas (ignora horarios)
+                                    </label>
+                                </div>
+                                <div class="input-group">
+                                    <label for="horaInicio">Hora de Inicio:</label>
+                                    <input type="time" id="horaInicio" name="horaInicio">
+                                </div>
+                                <div class="input-group">
+                                    <label for="horaFin">Hora de Fin:</label>
+                                    <input type="time" id="horaFin" name="horaFin">
+                                </div>
+                                <div class="input-group">
+                                    <label for="diasOperacion">Días de Operación (0=Dom, 1=Lun...):</label>
+                                    <input type="text" id="diasOperacion" name="diasOperacion" placeholder="Ej: 1,2,3,4,5">
+                                </div>
+                            </div>
+
+                            <!-- Sección de Notificaciones -->
+                            <div class="form-section">
+                                <h3>Configuración de Notificaciones</h3>
+                                <div class="input-group">
+                                    <label style="display: flex; align-items: center; gap: 8px;">
+                                        <input type="checkbox" id="notifErroresCriticos" name="NOTIFICACIONES_EMAIL_ERRORES_CRITICOS">
+                                        Enviar Email en Errores Críticos
+                                    </label>
+                                </div>
+                                <div class="input-group">
+                                    <label style="display: flex; align-items: center; gap: 8px;">
+                                        <input type="checkbox" id="notifEvacuacion" name="NOTIFICACIONES_EMAIL_EVACUACION">
+                                        Enviar Email al Iniciar/Finalizar Evacuación Real
+                                    </label>
+                                </div>
+                                <div class="input-group">
+                                    <label for="adminEmail">Email del Administrador:</label>
+                                    <input type="email" id="adminEmail" name="adminEmail" placeholder="correo@empresa.com">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <!-- Sección de Mensajes UI -->
+                            <div class="form-section">
+                                <h3>Mensajes de Interfaz</h3>
+                                <div class="input-group">
+                                    <label for="mensajeBienvenida">Mensaje de Bienvenida (Formulario):</label>
+                                    <input type="text" id="mensajeBienvenida" name="MENSAJE_BIENVENIDA">
+                                </div>
+                                <div class="input-group">
+                                    <label for="mensajeEvacuacion">Mensaje de Evacuación Activa:</label>
+                                    <input type="text" id="mensajeEvacuacion" name="MENSAJE_BIENVENIDA_EVACUACION">
+                                </div>
+                                <div class="input-group">
+                                    <label for="tiempoNotificacion">Tiempo Notificación (ms):</label>
+                                    <input type="number" id="tiempoNotificacion" name="TIEMPO_NOTIFICACION">
+                                </div>
+                            </div>
+
+                            <!-- Sección de Columnas y Límites -->
+                            <div class="form-section">
+                                <h3>Columnas y Límites</h3>
+                                <div class="input-group">
+                                    <label for="columnaCedula">Columna Cédula (Base Datos):</label>
+                                    <input type="number" id="columnaCedula" name="COLUMNA_CEDULA">
+                                </div>
+                                <div class="input-group">
+                                    <label for="columnaStatus">Columna Estado (Base Datos):</label>
+                                    <input type="number" id="columnaStatus" name="COLUMNA_STATUS">
+                                </div>
+                                <div class="input-group">
+                                    <label for="limiteHistorial">Límite Registros Historial:</label>
+                                    <input type="number" id="limiteHistorial" name="LIMITE_REGISTROS_HISTORIAL">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="text-align: center; margin-top: 32px;">
+                            <button type="submit" class="action-button secondary-button">
+                                <i class="fas fa-save"></i> Guardar Configuración
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Tab Content: Reportes -->
+            <div id="reportes" class="tab-content">
+                <div class="card">
+                    <h2>Reportes y Estadísticas</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 32px;">Genera informes detallados y visualizaciones de datos.</p>
+                    
+                    <div class="future-feature" style="background: linear-gradient(135deg, rgba(33, 150, 243, 0.1), rgba(33, 150, 243, 0.05));">
+                        <i class="fas fa-chart-bar" style="color: #2196F3;"></i>
+                        <h3>¡Próximamente!</h3>
+                        <p>Aquí podrás generar reportes personalizados, ver gráficos de actividad y exportar datos avanzados.</p>
+                        <p style="font-size: 12px;">Ej: Reportes por fecha, por área, por tipo de evento, etc.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content: Gestión de Áreas -->
+            <div id="gestion-areas" class="tab-content">
+                <div class="card">
+                    <h2>Gestión de Áreas/Zonas</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 32px;">Define y administra las diferentes áreas o zonas de las instalaciones.</p>
+                    
+                    <div class="future-feature" style="background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.05));">
+                        <i class="fas fa-map-marked-alt" style="color: #4CAF50;"></i>
+                        <h3>¡Próximamente!</h3>
+                        <p>Podrás añadir, editar y eliminar áreas, y asignar capacidad máxima a cada una.</p>
+                        <p style="font-size: 12px;">Esto permitirá un control de acceso y evacuación más granular.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content: Visitas -->
+            <div id="visitas" class="tab-content">
+                <div class="card">
+                    <h2>Gestión de Visitas y Pre-registro</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 32px;">Administra las visitas programadas y permite el pre-registro.</p>
+                    
+                    <div class="future-feature" style="background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(156, 39, 176, 0.05));">
+                        <i class="fas fa-calendar-check" style="color: #9C27B0;"></i>
+                        <h3>¡Próximamente!</h3>
+                        <p>Los empleados podrán pre-registrar a sus visitantes, generando QRs temporales para un acceso rápido.</p>
+                        <p style="font-size: 12px;">También podrás ver el estado de las visitas y notificar a los anfitriones.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content: Auditoría -->
+            <div id="auditoria" class="tab-content">
+                <div class="card">
+                    <h2>Logs de Auditoría</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 32px;">Revisa un registro detallado de todas las acciones del sistema.</p>
+                    
+                    <div class="future-feature" style="background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(244, 67, 54, 0.05));">
+                        <i class="fas fa-clipboard-list" style="color: #F44336;"></i>
+                        <h3>¡Próximamente!</h3>
+                        <p>Aquí podrás buscar, filtrar y visualizar todas las operaciones realizadas en el sistema, incluyendo accesos y cambios administrativos.</p>
+                        <p style="font-size: 12px;">Esencial para la seguridad y la trazabilidad.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================
+        // Variables globales
+        // =====================================================
+        let loaderTimeout;
+
+        // =====================================================
+        // Funciones de UI/UX
+        // =====================================================
+        function mostrarLoader(mensaje = 'Procesando...') {
+            const loaderOverlay = document.getElementById('loaderOverlay');
+            const loaderText = document.getElementById('loaderText');
+            if (loaderOverlay && loaderText) {
+                loaderText.textContent = mensaje;
+                loaderOverlay.style.display = 'flex';
+                loaderTimeout = setTimeout(() => {
+                    ocultarLoader();
+                    mostrarNotificacion('La operación está tardando más de lo esperado. Por favor, revise el log de Apps Script si el problema persiste.', 'error');
+                }, 30000);
+            }
+        }
+
+        function ocultarLoader() {
+            const loaderOverlay = document.getElementById('loaderOverlay');
+            if (loaderOverlay) {
+                loaderOverlay.style.display = 'none';
+                clearTimeout(loaderTimeout);
+            }
+        }
+
+        function mostrarNotificacion(mensaje, tipo = 'success') {
+            const container = document.getElementById('notificationContainer');
+            if (!container) return;
+
+            const notification = document.createElement('div');
+            notification.className = `notification-item ${tipo === 'error' ? 'error' : tipo === 'warning' ? 'warning' : ''}`;
+            notification.textContent = mensaje;
+
+            container.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 4000);
+        }
+
+        function toggleTheme() {
+            const body = document.body;
+            const themeButton = document.getElementById('themeToggleButton');
+            if (body.classList.contains('dark-theme')) {
+                body.classList.remove('dark-theme');
+                localStorage.setItem('surpass-admin-theme', 'light');
+                themeButton.innerHTML = '<i class="fas fa-moon"></i>';
+                mostrarNotificacion('Tema claro activado');
+            } else {
+                body.classList.add('dark-theme');
+                localStorage.setItem('surpass-admin-theme', 'dark');
+                themeButton.innerHTML = '<i class="fas fa-sun"></i>';
+                mostrarNotificacion('Tema oscuro activado');
+            }
+        }
+
+        function openTab(tabName) {
+            // Ocultar todos los contenidos de pestañas
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Desactivar todos los botones de pestañas
+            const tabButtons = document.querySelectorAll('.tab-button');
+            tabButtons.forEach(button => {
+                button.classList.remove('active');
+            });
+
+            // Mostrar el contenido seleccionado
+            const selectedTab = document.getElementById(tabName);
+            if (selectedTab) {
+                selectedTab.classList.add('active');
+            }
+
+            // Activar el botón seleccionado
+            const selectedButton = document.querySelector(`[data-tab="${tabName}"]`);
+            if (selectedButton) {
+                selectedButton.classList.add('active');
+            }
+
+            // Cargar configuración si se selecciona la pestaña de configuración
+            if (tabName === 'configuracion') {
+                cargarConfiguracion();
+            }
+        }
+
+        // =====================================================
+        // Lógica de comunicación con Google Apps Script
+        // =====================================================
+
+        // Gestión de Personas
+        document.getElementById('personaForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            mostrarLoader('Guardando persona...');
+            const formData = new FormData(this);
+            const personaData = {};
+            for (const [key, value] of formData.entries()) {
+                personaData[key] = value;
+            }
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    ocultarLoader();
+                    if (result.success) {
+                        mostrarNotificacion(result.message);
+                        document.getElementById('personaForm').reset();
+                    } else {
+                        mostrarNotificacion('Error: ' + result.message, 'error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    ocultarLoader();
+                    mostrarNotificacion('Error al guardar persona: ' + error.message, 'error');
+                    console.error('Error:', error);
+                })
+                .agregarActualizarPersona(personaData);
+        });
+
+        document.getElementById('eliminarPersonaForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            mostrarLoader('Eliminando persona...');
+            const cedula = document.getElementById('cedulaEliminar').value;
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    ocultarLoader();
+                    if (result.success) {
+                        mostrarNotificacion(result.message);
+                        document.getElementById('eliminarPersonaForm').reset();
+                    } else {
+                        mostrarNotificacion('Error: ' + result.message, 'error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    ocultarLoader();
+                    mostrarNotificacion('Error al eliminar persona: ' + error.message, 'error');
+                    console.error('Error:', error);
+                })
+                .eliminarPersona(cedula);
+        });
+
+        function exportarDatos() {
+            mostrarLoader('Exportando datos...');
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    ocultarLoader();
+                    if (result.success) {
+                        if (result.fileUrl) {
+                            mostrarNotificacion('Datos exportados correctamente. Descargando...');
+                            window.open(result.fileUrl, '_blank');
+                        } else {
+                            mostrarNotificacion('Datos exportados correctamente.');
+                        }
+                    } else {
+                        mostrarNotificacion('Error al exportar: ' + result.message, 'error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    ocultarLoader();
+                    mostrarNotificacion('Error al exportar: ' + error.message, 'error');
+                    console.error('Error:', error);
+                })
+                .exportarBaseDeDatos();
+        }
+
+        // =====================================================
+        // Lógica de Evacuación / Simulacro
+        // =====================================================
+        function handleIniciarEvacuacion() {
+            const isSimulacro = document.querySelector('input[name="evacuationType"]:checked').value === 'simulacro';
+            let notasSimulacro = '';
+            if (isSimulacro) {
+                notasSimulacro = document.getElementById('simulacroNotas').value;
+                if (!notasSimulacro.trim()) {
+                    mostrarNotificacion('Por favor, ingrese notas para el simulacro.', 'error');
+                    return;
+                }
+            }
+
+            mostrarLoader('Iniciando evacuación...');
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    ocultarLoader();
+                    if (result.success) {
+                        mostrarNotificacion(result.message);
+                        if (!isSimulacro) {
+                            document.getElementById('evacuationStatus').textContent = 'Activa (Real)';
+                        }
+                    } else {
+                        mostrarNotificacion('Error: ' + result.message, 'error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    ocultarLoader();
+                    mostrarNotificacion('Error al iniciar evacuación: ' + error.message, 'error');
+                    console.error('Error:', error);
+                })
+                .iniciarEvacuacion(isSimulacro, notasSimulacro);
+        }
+
+        function finalizarEvacuacion() {
+            mostrarLoader('Finalizando evacuación...');
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    ocultarLoader();
+                    if (result.success) {
+                        mostrarNotificacion(result.message);
+                        document.getElementById('evacuationStatus').textContent = 'Inactiva';
+                    } else {
+                        mostrarNotificacion('Error: ' + result.message, 'error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    ocultarLoader();
+                    mostrarNotificacion('Error al finalizar evacuación: ' + error.message, 'error');
+                    console.error('Error:', error);
+                })
+                .finalizarEvacuacion();
+        }
+
+        function obtenerEstadoEvacuacion() {
+            google.script.run
+                .withSuccessHandler(function(status) {
+                    document.getElementById('evacuationStatus').textContent = status;
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error al obtener estado de evacuación:', error);
+                    document.getElementById('evacuationStatus').textContent = 'Error al cargar';
+                })
+                .getEvacuationStatus();
+        }
+
+        // =====================================================
+        // Lógica de Configuración
+        // =====================================================
+        document.getElementById('configForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            mostrarLoader('Guardando configuración...');
+            const formData = new FormData(this);
+            const configData = {};
+            for (const [key, value] of formData.entries()) {
+                if (this.elements[key] && this.elements[key].type === 'checkbox') {
+                    configData[key] = this.elements[key].checked;
+                } else {
+                    configData[key] = value;
+                }
+            }
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    ocultarLoader();
+                    if (result.success) {
+                        mostrarNotificacion(result.message);
+                    } else {
+                        mostrarNotificacion('Error: ' + result.message, 'error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    ocultarLoader();
+                    mostrarNotificacion('Error al guardar configuración: ' + error.message, 'error');
+                    console.error('Error:', error);
+                })
+                .actualizarConfiguracion(configData);
+        });
+
+        function cargarConfiguracion() {
+            mostrarLoader('Cargando configuración actual...');
+            google.script.run
+                .withSuccessHandler(function(config) {
+                    ocultarLoader();
+                    if (config) {
+                        document.getElementById('adminEmail').value = config.adminEmail || '';
+                        document.getElementById('horaInicio').value = config.horaInicio || '';
+                        document.getElementById('horaFin').value = config.horaFin || '';
+                        document.getElementById('diasOperacion').value = config.diasOperacion || '';
+                        document.getElementById('mensajeBienvenida').value = config.MENSAJE_BIENVENIDA || '';
+                        document.getElementById('mensajeEvacuacion').value = config.MENSAJE_BIENVENIDA_EVACUACION || '';
+                        document.getElementById('tiempoNotificacion').value = config.TIEMPO_NOTIFICACION || '';
+                        document.getElementById('notifErroresCriticos').checked = config.NOTIFICACIONES_EMAIL_ERRORES_CRITICOS;
+                        document.getElementById('notifEvacuacion').checked = config.NOTIFICACIONES_EMAIL_EVACUACION;
+                        document.getElementById('limiteHistorial').value = config.LIMITE_REGISTROS_HISTORIAL || '';
+                        document.getElementById('columnaCedula').value = config.COLUMNA_CEDULA || '';
+                        document.getElementById('columnaStatus').value = config.COLUMNA_STATUS || '';
+                        document.getElementById('modo24Horas').checked = config.MODO_24_HORAS;
+                    } else {
+                        mostrarNotificacion('No se pudo cargar la configuración.', 'error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    ocultarLoader();
+                    mostrarNotificacion('Error al cargar configuración: ' + error.message, 'error');
+                    console.error('Error:', error);
+                })
+                .obtenerConfiguracion();
+        }
+
+        // =====================================================
+        // Event Listeners al cargar el DOM
+        // =====================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Aplicar tema guardado
+            const savedTheme = localStorage.getItem('surpass-admin-theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-theme');
+                document.getElementById('themeToggleButton').innerHTML = '<i class="fas fa-sun"></i>';
+            }
+
+            // Asignar event listeners
+            document.getElementById('themeToggleButton').addEventListener('click', toggleTheme);
+            document.getElementById('exportarDatosBtn').addEventListener('click', exportarDatos);
+            document.getElementById('iniciarEvacuacionBtn').addEventListener('click', handleIniciarEvacuacion);
+            document.getElementById('finalizarEvacuacionBtn').addEventListener('click', finalizarEvacuacion);
+
+            // Event listeners para pestañas
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', function() {
+                    openTab(this.dataset.tab);
+                });
+            });
+
+            // Lógica para mostrar/ocultar notas del simulacro
+            const realEvacuationRadio = document.getElementById('realEvacuation');
+            const drillEvacuationRadio = document.getElementById('drillEvacuation');
+            const simulacroNotasContainer = document.getElementById('simulacroNotasContainer');
+
+            function toggleSimulacroNotes() {
+                if (drillEvacuationRadio.checked) {
+                    simulacroNotasContainer.style.display = 'block';
+                } else {
+                    simulacroNotasContainer.style.display = 'none';
+                }
+            }
+
+            realEvacuationRadio.addEventListener('change', toggleSimulacroNotes);
+            drillEvacuationRadio.addEventListener('change', toggleSimulacroNotes);
+
+            // Cargar estado de evacuación al inicio
+            obtenerEstadoEvacuacion();
+        });
+    </script>
+</body>
+</html>
