@@ -2638,7 +2638,7 @@
                     CACHE_ESTADISTICAS = null;
                 }
                 
-                // 🔧 NUEVO: Marcar estadísticas como invalidadas
+                // 🔧 CRÍTICO: Marcar estadísticas como invalidadas
                 CACHE_ESTADISTICAS_INVALIDADO = true;
                 TIMESTAMP_ULTIMA_EVACUACION = new Date().getTime();
                 
@@ -2647,15 +2647,60 @@
                 console.log('⚠️ No se pudieron resetear variables:', varError.message);
             }
             
-            // 4. Forzar nuevo cálculo de personas dentro
+            // 4. 🔧 NUEVO: Forzar recálculo múltiple de estadísticas hasta consistencia
+            let estadisticasConsistentes = false;
+            let intentos = 0;
+            let ultimasEstadisticas = null;
+            const maxIntentos = 3;
+            
+            try {
+                while (!estadisticasConsistentes && intentos < maxIntentos) {
+                    intentos++;
+                    console.log(`🔄 Intento ${intentos}/${maxIntentos} de recálculo de estadísticas...`);
+                    
+                    // Esperar antes de cada intento (excepto el primero)
+                    if (intentos > 1) {
+                        Utilities.sleep(300 * intentos); // Espera incremental
+                        SpreadsheetApp.flush(); // Flush adicional
+                    }
+                    
+                    // Forzar nuevo cálculo
+                    const estadisticasActuales = obtenerEstadisticas();
+                    
+                    if (intentos === 1) {
+                        ultimasEstadisticas = estadisticasActuales;
+                    } else {
+                        // Verificar consistencia entre intentos
+                        if (estadisticasActuales.entradas === ultimasEstadisticas.entradas &&
+                            estadisticasActuales.salidas === ultimasEstadisticas.salidas) {
+                            estadisticasConsistentes = true;
+                            console.log(`✅ Estadísticas consistentes en intento ${intentos}`);
+                        } else {
+                            console.log(`⚠️ Estadísticas inconsistentes en intento ${intentos}, reintentando...`);
+                            ultimasEstadisticas = estadisticasActuales;
+                        }
+                    }
+                }
+                
+                console.log(`📊 Estadísticas finales: ${ultimasEstadisticas?.entradas || 0} entradas, ${ultimasEstadisticas?.salidas || 0} salidas`);
+                
+            } catch (statsError) {
+                console.error('❌ Error recalculando estadísticas:', statsError.message);
+                ultimasEstadisticas = { entradas: 0, salidas: 0, error: statsError.message };
+            }
+
+            // 5. Forzar nuevo cálculo de personas dentro
             try {
                 const nuevosResultados = getEvacuacionDataForClient();
                 console.log(`🔍 Recálculo forzado: ${nuevosResultados.totalDentro} personas dentro`);
                 
                 return {
                     success: true,
-                    mensaje: 'Recálculo forzado completado',
+                    mensaje: `Recálculo forzado completado en ${intentos} intento(s)`,
                     personasDentro: nuevosResultados.totalDentro,
+                    estadisticas: ultimasEstadisticas,
+                    consistente: estadisticasConsistentes,
+                    intentos: intentos,
                     timestamp: new Date().toISOString()
                 };
                 
@@ -2663,7 +2708,9 @@
                 console.error('❌ Error en recálculo forzado:', recalculoError.message);
                 return {
                     success: false,
-                    mensaje: 'Error en recálculo forzado: ' + recalculoError.message
+                    mensaje: 'Error en recálculo forzado: ' + recalculoError.message,
+                    estadisticas: ultimasEstadisticas,
+                    intentos: intentos
                 };
             }
             
@@ -2676,6 +2723,204 @@
             return {
                 success: false,
                 mensaje: 'Error crítico en recálculo: ' + error.message
+            };
+        }
+    }
+
+    /**
+     * ✅ FUNCIÓN NUEVA: Verificar integridad de datos en estadísticas
+     */
+    function verificarIntegridadEstadisticas() {
+        try {
+            console.log('🔍 Verificando integridad de datos de estadísticas...');
+            
+            const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respuestas formulario');
+            if (!sheet) {
+                return { 
+                    success: false, 
+                    error: 'Hoja "Respuestas formulario" no encontrada' 
+                };
+            }
+            
+            const data = sheet.getDataRange().getValues();
+            const problemas = [];
+            let registrosValidos = 0;
+            let fechasInvalidas = 0;
+            let tiposInvalidos = 0;
+            
+            for (let i = 1; i < data.length; i++) { // Saltar header
+                const row = data[i];
+                const fecha = row[0];
+                const cedula = row[1];
+                const tipo = row[2];
+                
+                // Verificar fecha
+                let fechaValida = false;
+                try {
+                    if (fecha instanceof Date) {
+                        fechaValida = !isNaN(fecha.getTime());
+                    } else if (fecha) {
+                        const fechaConvertida = new Date(fecha);
+                        fechaValida = !isNaN(fechaConvertida.getTime());
+                    }
+                } catch (e) {
+                    fechaValida = false;
+                }
+                
+                if (!fechaValida) {
+                    fechasInvalidas++;
+                    problemas.push(`Fila ${i + 1}: Fecha inválida [${fecha}]`);
+                }
+                
+                // Verificar tipo
+                const tipoNormalizado = String(tipo || '').toLowerCase().trim();
+                if (tipoNormalizado !== 'entrada' && tipoNormalizado !== 'salida') {
+                    tiposInvalidos++;
+                    problemas.push(`Fila ${i + 1}: Tipo inválido [${tipo}]`);
+                }
+                
+                // Verificar cédula
+                if (!cedula || String(cedula).trim().length === 0) {
+                    problemas.push(`Fila ${i + 1}: Cédula vacía`);
+                }
+                
+                if (fechaValida && (tipoNormalizado === 'entrada' || tipoNormalizado === 'salida') && cedula) {
+                    registrosValidos++;
+                }
+            }
+            
+            const totalRegistros = data.length - 1;
+            const porcentajeValidos = totalRegistros > 0 ? (registrosValidos / totalRegistros * 100).toFixed(2) : 0;
+            
+            console.log(`📊 Integridad verificada: ${registrosValidos}/${totalRegistros} registros válidos (${porcentajeValidos}%)`);
+            
+            return {
+                success: true,
+                totalRegistros: totalRegistros,
+                registrosValidos: registrosValidos,
+                fechasInvalidas: fechasInvalidas,
+                tiposInvalidos: tiposInvalidos,
+                porcentajeValidos: parseFloat(porcentajeValidos),
+                problemas: problemas.slice(0, 10), // Máximo 10 problemas para no saturar logs
+                esSaludable: porcentajeValidos >= 95 // Considerar saludable si 95%+ son válidos
+            };
+            
+        } catch (error) {
+            console.error('❌ Error verificando integridad:', error.message);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * ✅ FUNCIÓN NUEVA: Diagnóstico específico de estadísticas
+     */
+    function diagnosticarEstadisticas() {
+        try {
+            console.log('🔍 Iniciando diagnóstico específico de estadísticas...');
+            
+            const resultado = {
+                timestamp: new Date().toISOString(),
+                tests: {},
+                recomendaciones: [],
+                resumen: ''
+            };
+            
+            // Test 1: Verificar integridad de datos
+            console.log('📊 Test 1: Verificando integridad de datos...');
+            const integridad = verificarIntegridadEstadisticas();
+            resultado.tests.integridad = integridad;
+            
+            if (!integridad.esSaludable) {
+                resultado.recomendaciones.push('⚠️ Se detectaron problemas de integridad en los datos. Revisar fechas y tipos.');
+            }
+            
+            // Test 2: Comparar estadísticas entre métodos
+            console.log('📊 Test 2: Comparando métodos de cálculo...');
+            const estadisticasDirectas = obtenerEstadisticas();
+            const estadisticasBasicas = obtenerEstadisticasBasicas();
+            
+            resultado.tests.estadisticasDirectas = estadisticasDirectas;
+            resultado.tests.estadisticasBasicas = estadisticasBasicas;
+            
+            const consistenciaEntradas = estadisticasDirectas.entradas === estadisticasBasicas.entradas;
+            const consistenciaSalidas = estadisticasDirectas.salidas === estadisticasBasicas.salidas;
+            
+            resultado.tests.consistencia = {
+                entradas: consistenciaEntradas,
+                salidas: consistenciaSalidas,
+                general: consistenciaEntradas && consistenciaSalidas
+            };
+            
+            if (!resultado.tests.consistencia.general) {
+                resultado.recomendaciones.push('🔴 CRÍTICO: Inconsistencia entre métodos de cálculo de estadísticas.');
+            }
+            
+            // Test 3: Verificar cache
+            console.log('📊 Test 3: Verificando estado del cache...');
+            resultado.tests.cache = {
+                invalidado: CACHE_ESTADISTICAS_INVALIDADO,
+                timestamp_evacuacion: TIMESTAMP_ULTIMA_EVACUACION || 'No definido'
+            };
+            
+            if (CACHE_ESTADISTICAS_INVALIDADO) {
+                resultado.recomendaciones.push('⚠️ Cache de estadísticas marcado como invalidado. Esto es normal después de evacuaciones.');
+            }
+            
+            // Test 4: Verificar personas dentro
+            console.log('📊 Test 4: Verificando conteo de personas dentro...');
+            try {
+                const datosEvacuacion = getEvacuacionDataForClient();
+                resultado.tests.personasDentro = {
+                    total: datosEvacuacion.totalDentro,
+                    metodo: 'getEvacuacionDataForClient',
+                    success: true
+                };
+            } catch (e) {
+                resultado.tests.personasDentro = {
+                    error: e.message,
+                    success: false
+                };
+                resultado.recomendaciones.push('🔴 Error obteniendo datos de evacuación.');
+            }
+            
+            // Test 5: Verificar rendimiento
+            console.log('📊 Test 5: Verificando rendimiento...');
+            const startTime = new Date().getTime();
+            obtenerEstadisticas();
+            const tiempoRespuesta = new Date().getTime() - startTime;
+            
+            resultado.tests.rendimiento = {
+                tiempoMs: tiempoRespuesta,
+                esRapido: tiempoRespuesta < 2000
+            };
+            
+            if (tiempoRespuesta > 2000) {
+                resultado.recomendaciones.push('⚠️ Tiempo de respuesta lento. Considerar optimización.');
+            }
+            
+            // Resumen
+            const problemasEncontrados = resultado.recomendaciones.length;
+            resultado.resumen = `Diagnóstico completado. ${problemasEncontrados} problema(s) encontrado(s).`;
+            
+            if (problemasEncontrados === 0) {
+                resultado.resumen += ' ✅ Sistema de estadísticas funcionando correctamente.';
+            } else {
+                resultado.resumen += ' ⚠️ Se requiere atención.';
+            }
+            
+            console.log('✅ Diagnóstico completado:', resultado);
+            
+            return resultado;
+            
+        } catch (error) {
+            console.error('❌ Error en diagnóstico de estadísticas:', error.message);
+            return {
+                error: error.message,
+                timestamp: new Date().toISOString(),
+                resumen: 'Error durante diagnóstico: ' + error.message
             };
         }
     }
@@ -4050,14 +4295,15 @@
     // =====================================================
 
     /**
-     * Obtiene estadísticas en tiempo real del sistema
+     * Obtiene estadísticas en tiempo real del sistema - VERSIÓN MEJORADA
      */
     function obtenerEstadisticas() {
         try {
-            // 🔧 NUEVO: Verificar si necesita forzar recálculo
+            // 🔧 CRÍTICO: Siempre forzar flush si cache invalidado
             if (CACHE_ESTADISTICAS_INVALIDADO) {
                 console.log('🔄 Cache de estadísticas invalidado, forzando recálculo completo...');
-                SpreadsheetApp.flush(); // Forzar flush antes de leer datos
+                SpreadsheetApp.flush();
+                Utilities.sleep(100); // Pequeña pausa para asegurar sincronización
             }
             
             const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respuestas formulario');
@@ -4066,13 +4312,11 @@
                 throw new Error('No se encontró la hoja "Respuestas formulario"');
             }
 
-            // 🔧 NUEVO: Forzar recarga de datos si es necesario
-            const data = CACHE_ESTADISTICAS_INVALIDADO ? 
-                sheet.getDataRange().getValues() : // Forzar nueva lectura
-                sheet.getDataRange().getValues();   // Lectura normal
+            // 🔧 MEJORADO: Siempre obtener datos frescos cuando cache invalidado
+            const data = sheet.getDataRange().getValues();
             
             if (data.length <= 1) {
-                // 🔧 NUEVO: Marcar cache como válido después del recálculo
+                // Marcar cache como válido después del recálculo
                 if (CACHE_ESTADISTICAS_INVALIDADO) {
                     CACHE_ESTADISTICAS_INVALIDADO = false;
                     console.log('✅ Cache de estadísticas revalidado (sin datos)');
@@ -4086,29 +4330,60 @@
                 };
             }
 
+            // 🔧 MEJORADO: Lógica de fechas más robusta
             const today = new Date();
-            today.setHours(0, 0, 0, 0);
+            const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+            const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
 
             let entradas = 0;
             let salidas = 0;
+            let entradasTotal = 0; // Contador total (todos los días)
+            let salidasTotal = 0;  // Contador total (todos los días)
             const recentRecords = [];
+
+            console.log(`📊 Procesando ${data.length - 1} registros para estadísticas...`);
 
             // Procesar datos desde el más reciente
             for (let i = data.length - 1; i > 0; i--) {
                 const row = data[i];
-                const fecha = row[0] instanceof Date ? row[0] : new Date(row[0]);
-                const tipo = String(row[2] || '').toLowerCase();
-                const cedula = String(row[1] || '');
-                const estado = String(row[3] || '');
+                
+                // 🔧 MEJORADO: Manejo más robusto de fechas
+                let fecha = null;
+                try {
+                    if (row[0] instanceof Date) {
+                        fecha = new Date(row[0].getTime()); // Clonar fecha
+                    } else if (row[0]) {
+                        fecha = new Date(row[0]);
+                        // Verificar si la fecha es válida
+                        if (isNaN(fecha.getTime())) {
+                            console.warn(`⚠️ Fecha inválida en fila ${i + 1}: ${row[0]}`);
+                            continue; // Saltar este registro
+                        }
+                    } else {
+                        console.warn(`⚠️ Fecha vacía en fila ${i + 1}`);
+                        continue;
+                    }
+                } catch (e) {
+                    console.warn(`⚠️ Error procesando fecha en fila ${i + 1}: ${e.message}`);
+                    continue;
+                }
 
-                // Contar accesos de hoy
-                if (fecha >= today) {
+                const tipo = String(row[2] || '').toLowerCase().trim();
+                const cedula = String(row[1] || '').trim();
+                const estado = String(row[3] || '').trim();
+
+                // 🔧 NUEVO: Contar TODOS los registros (para estadísticas totales)
+                if (tipo === 'entrada') entradasTotal++;
+                if (tipo === 'salida') salidasTotal++;
+
+                // 🔧 MEJORADO: Contar accesos de HOY con mejor lógica de fecha
+                if (fecha && fecha >= todayStart && fecha <= todayEnd) {
                     if (tipo === 'entrada') entradas++;
                     if (tipo === 'salida') salidas++;
                 }
 
                 // Agregar a registros recientes (últimos 10)
-                if (recentRecords.length < 10) {
+                if (recentRecords.length < 10 && fecha && cedula) {
                     recentRecords.push({
                         cedula: cedula,
                         accion: tipo,
@@ -4116,34 +4391,59 @@
                             hour: '2-digit', 
                             minute: '2-digit' 
                         }),
-                        estado: estado
+                        estado: estado,
+                        fecha: fecha.toLocaleDateString('es-ES')
                     });
                 }
             }
 
-            logError(`Estadísticas calculadas: ${entradas} entradas, ${salidas} salidas`, 'INFO');
+            // 🔧 MEJORADO: Logging más detallado
+            console.log(`📊 Estadísticas calculadas:`);
+            console.log(`   - Entradas HOY: ${entradas}`);
+            console.log(`   - Salidas HOY: ${salidas}`);
+            console.log(`   - Entradas TOTAL: ${entradasTotal}`);
+            console.log(`   - Salidas TOTAL: ${salidasTotal}`);
+            console.log(`   - Total registros: ${data.length - 1}`);
 
-            // 🔧 NUEVO: Marcar cache como válido después del recálculo exitoso
+            logError(`Estadísticas calculadas: ${entradas} entradas hoy, ${salidas} salidas hoy`, 'INFO');
+
+            // 🔧 CRÍTICO: Marcar cache como válido después del recálculo exitoso
             if (CACHE_ESTADISTICAS_INVALIDADO) {
                 CACHE_ESTADISTICAS_INVALIDADO = false;
-                console.log(`✅ Cache de estadísticas revalidado: ${entradas} entradas, ${salidas} salidas`);
+                console.log(`✅ Cache de estadísticas revalidado: ${entradas} entradas, ${salidas} salidas HOY`);
             }
 
             return {
                 entradas: entradas,
                 salidas: salidas,
                 total: data.length - 1,
-                recentRecords: recentRecords
+                recentRecords: recentRecords,
+                // 🔧 NUEVOS CAMPOS: Estadísticas adicionales
+                entradasTotal: entradasTotal,
+                salidasTotal: salidasTotal,
+                registrosHoy: entradas + salidas,
+                ultimaActualizacion: new Date().toISOString()
             };
             
         } catch (error) {
             logError('Error en obtenerEstadisticas', 'ERROR', { error: error.message });
+            
+            // 🔧 MEJORADO: Reset cache en caso de error
+            if (CACHE_ESTADISTICAS_INVALIDADO) {
+                CACHE_ESTADISTICAS_INVALIDADO = false;
+                console.log('❌ Cache resetado debido a error en obtenerEstadisticas');
+            }
+            
             return {
                 entradas: 0,
                 salidas: 0,
                 total: 0,
                 recentRecords: [],
-                error: error.message
+                error: error.message,
+                entradasTotal: 0,
+                salidasTotal: 0,
+                registrosHoy: 0,
+                ultimaActualizacion: new Date().toISOString()
             };
         }
     }

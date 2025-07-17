@@ -504,6 +504,24 @@ input[type="submit"]:hover {
     }
 }
 
+@keyframes countUpActive {
+    0% {
+        opacity: 0;
+        transform: scale(0.8) translateY(15px);
+        background-color: rgba(255, 193, 7, 0.2);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.1) translateY(-5px);
+        background-color: rgba(255, 193, 7, 0.4);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        background-color: transparent;
+    }
+}
+
 @keyframes stripesMove {
     0% { transform: translateX(-50px); }
     100% { transform: translateX(50px); }
@@ -3718,7 +3736,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 ocultarLoading();
                 cargarPersonal(); // Esto parece redundante si ya se actualizó personalGlobal
                 updateStatsPanel();
-                setInterval(updateStatsPanel, 30000);
+                // 🔧 NUEVO: Actualización más frecuente durante evacuaciones (cada 3 segundos)
+                setInterval(updateStatsPanel, 3000);
                 if (navigator.onLine) {
                     procesarPendientes();
                 }
@@ -3760,7 +3779,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // ✅ 15. INICIALIZAR ESTADÍSTICAS
         updateStatsPanel();
-        setInterval(updateStatsPanel, 30000);
+        // 🔧 NUEVO: Actualización más frecuente para tiempo real (cada 3 segundos)
+        setInterval(updateStatsPanel, 3000);
 
         // ✅ 16. APLICAR TEMA A ELEMENTOS
         applyThemeToElement(document.getElementById('contenidoVistaPrevia'), document.body.classList.contains('dark-theme') ? 'dark' : 'light');
@@ -4591,20 +4611,99 @@ function actualizarEstadoEscaner() {
 }
 
 // Estadísticas en tiempo real
+let updateStatsInterval = null;
+let ultimasEstadisticas = { entradas: 0, salidas: 0 };
+let actividadRecienteDetectada = false;
+
 function updateStatsPanel() {
     if (!mostrarEstadisticas) return;
 
+    // 🔧 NUEVO: Indicador visual de actualización
+    const statsPanel = document.getElementById('statsPanel');
+    if (statsPanel) {
+        statsPanel.style.opacity = '0.8';
+        statsPanel.style.borderColor = '#2196F3';
+    }
+
     google.script.run
         .withSuccessHandler(function(stats) {
-            entradasLiveSpan.textContent = stats.entradas;
-            salidasLiveSpan.textContent = stats.salidas;
+            // Restaurar apariencia normal del panel
+            if (statsPanel) {
+                statsPanel.style.opacity = '1';
+                statsPanel.style.borderColor = '';
+            }
+            
+            // 🔧 MEJORADO: Validación más robusta de los datos
+            if (!stats || typeof stats !== 'object') {
+                console.error('❌ Datos de estadísticas inválidos recibidos:', stats);
+                return;
+            }
+            
+            // 🔧 MEJORADO: Detectar cambios en las estadísticas con más precisión
+            const huboActividad = 
+                stats.entradas !== ultimasEstadisticas.entradas || 
+                stats.salidas !== ultimasEstadisticas.salidas;
+            
+            // 🔧 NUEVO: Detectar datos inconsistentes
+            const hayInconsistencia = 
+                isNaN(stats.entradas) || isNaN(stats.salidas) || 
+                stats.entradas < 0 || stats.salidas < 0;
+            
+            if (hayInconsistencia) {
+                console.warn('⚠️ Datos inconsistentes detectados:', stats);
+                
+                // Intentar recuperar datos válidos
+                setTimeout(() => {
+                    console.log('🔄 Reintentando obtener estadísticas válidas...');
+                    updateStatsPanel();
+                }, 1000);
+                return;
+            }
+            
+            if (huboActividad && !actividadRecienteDetectada) {
+                console.log('🚨 Actividad detectada - Aumentando frecuencia de actualización');
+                actividadRecienteDetectada = true;
+                
+                // Aumentar frecuencia temporalmente (cada 1 segundo por 2 minutos)
+                if (updateStatsInterval) {
+                    clearInterval(updateStatsInterval);
+                }
+                updateStatsInterval = setInterval(updateStatsPanel, 1000);
+                
+                // Volver a frecuencia normal después de 2 minutos
+                setTimeout(() => {
+                    console.log('⏰ Volviendo a frecuencia normal de actualización');
+                    actividadRecienteDetectada = false;
+                    if (updateStatsInterval) {
+                        clearInterval(updateStatsInterval);
+                    }
+                    updateStatsInterval = setInterval(updateStatsPanel, 3000);
+                }, 120000); // 2 minutos
+            }
+            
+            // Actualizar valores anteriores
+            ultimasEstadisticas = { entradas: stats.entradas, salidas: stats.salidas };
+            
+            // 🔧 MEJORADO: Actualización visual con mejor feedback
+            if (entradasLiveSpan) {
+                entradasLiveSpan.textContent = stats.entradas;
+            }
+            if (salidasLiveSpan) {
+                salidasLiveSpan.textContent = stats.salidas;
+            }
 
-            // Animación
-            entradasLiveSpan.style.animation = 'countUp 0.5s ease';
-            salidasLiveSpan.style.animation = 'countUp 0.5s ease';
+            // Animación más prominente si hay actividad
+            const animationClass = huboActividad ? 'countUpActive' : 'countUp';
+            if (entradasLiveSpan) {
+                entradasLiveSpan.style.animation = `${animationClass} 0.5s ease`;
+            }
+            if (salidasLiveSpan) {
+                salidasLiveSpan.style.animation = `${animationClass} 0.5s ease`;
+            }
+            
             setTimeout(() => {
-                entradasLiveSpan.style.animation = '';
-                salidasLiveSpan.style.animation = '';
+                if (entradasLiveSpan) entradasLiveSpan.style.animation = '';
+                if (salidasLiveSpan) salidasLiveSpan.style.animation = '';
             }, 500);
 
             // Gráfica
@@ -4614,9 +4713,24 @@ function updateStatsPanel() {
             if (stats.recentRecords && stats.recentRecords.length > 0) {
                 updateLiveHistoryFromStats(stats.recentRecords);
             }
+            
+            // 🔧 NUEVO: Log de timestamp para debugging
+            console.log(`📊 Estadísticas actualizadas: ${stats.entradas} entradas, ${stats.salidas} salidas [${new Date().toLocaleTimeString()}]`);
         })
         .withFailureHandler(function(error) {
-            console.error('Error al obtener estadísticas:', error);
+            // Restaurar apariencia del panel
+            if (statsPanel) {
+                statsPanel.style.opacity = '1';
+                statsPanel.style.borderColor = '#ff5722';
+            }
+            
+            console.error('❌ Error al obtener estadísticas:', error);
+            
+            // 🔧 NUEVO: Reintento automático en caso de error
+            setTimeout(() => {
+                console.log('🔄 Reintentando actualización de estadísticas...');
+                updateStatsPanel();
+            }, 5000); // Reintentar en 5 segundos
         })
         .obtenerEstadisticas();
 }
@@ -5650,7 +5764,7 @@ function actualizarInterfazPostEvacuacionReal(cedulasEvacuadas, resultado) {
  * @param {number} cantidadEvacuados - Número de personas evacuadas
  */
 /**
- * Actualiza las estadísticas con datos específicos del servidor
+ * Actualiza las estadísticas con datos específicos del servidor - VERSIÓN MEJORADA
  * @param {Object} estadisticas - Datos de estadísticas del servidor
  */
 function actualizarEstadisticasConDatos(estadisticas) {
@@ -5658,21 +5772,47 @@ function actualizarEstadisticasConDatos(estadisticas) {
     
     if (!mostrarEstadisticas) return;
     
+    // 🔧 NUEVO: Verificar que los datos sean válidos
+    if (!estadisticas || typeof estadisticas !== 'object') {
+        console.warn('⚠️ Datos de estadísticas inválidos:', estadisticas);
+        return;
+    }
+    
     // Actualizar contadores directamente con los datos del servidor
     if (entradasLiveSpan && estadisticas.entradas !== undefined) {
+        const valorAnterior = parseInt(entradasLiveSpan.textContent) || 0;
         entradasLiveSpan.textContent = estadisticas.entradas;
-        entradasLiveSpan.style.animation = 'countUp 0.5s ease';
-        setTimeout(() => {
-            entradasLiveSpan.style.animation = '';
-        }, 500);
+        
+        // Animación diferente si cambió el valor
+        if (valorAnterior !== estadisticas.entradas) {
+            entradasLiveSpan.style.animation = 'countUpActive 0.8s ease';
+            entradasLiveSpan.style.fontWeight = 'bold';
+            entradasLiveSpan.style.color = '#4CAF50';
+            
+            setTimeout(() => {
+                entradasLiveSpan.style.animation = '';
+                entradasLiveSpan.style.fontWeight = '';
+                entradasLiveSpan.style.color = '';
+            }, 800);
+        }
     }
     
     if (salidasLiveSpan && estadisticas.salidas !== undefined) {
+        const valorAnterior = parseInt(salidasLiveSpan.textContent) || 0;
         salidasLiveSpan.textContent = estadisticas.salidas;
-        salidasLiveSpan.style.animation = 'countUp 0.5s ease';
-        setTimeout(() => {
-            salidasLiveSpan.style.animation = '';
-        }, 500);
+        
+        // Animación diferente si cambió el valor
+        if (valorAnterior !== estadisticas.salidas) {
+            salidasLiveSpan.style.animation = 'countUpActive 0.8s ease';
+            salidasLiveSpan.style.fontWeight = 'bold';
+            salidasLiveSpan.style.color = '#FF9800';
+            
+            setTimeout(() => {
+                salidasLiveSpan.style.animation = '';
+                salidasLiveSpan.style.fontWeight = '';
+                salidasLiveSpan.style.color = '';
+            }, 800);
+        }
     }
     
     // Actualizar gráfica
@@ -5680,10 +5820,24 @@ function actualizarEstadisticasConDatos(estadisticas) {
         drawMiniChart(estadisticas.entradas, estadisticas.salidas);
     }
     
-    // Programar una actualización completa después de un momento para sincronizar
+    // 🔧 NUEVO: Actualizar cache local para evitar inconsistencias
+    ultimasEstadisticas = { 
+        entradas: estadisticas.entradas || 0, 
+        salidas: estadisticas.salidas || 0 
+    };
+    
+    // 🔧 NUEVO: Forzar actualización del historial si hay registros recientes
+    if (estadisticas.recentRecords && estadisticas.recentRecords.length > 0) {
+        updateLiveHistoryFromStats(estadisticas.recentRecords);
+    }
+    
+    console.log('✅ Estadísticas actualizadas exitosamente');
+    
+    // Programar verificación después de un momento para asegurar consistencia
     setTimeout(() => {
+        console.log('🔄 Verificación de consistencia post-actualización...');
         updateStatsPanel();
-    }, 1000);
+    }, 2000);
 }
 
 function actualizarEstadisticasPostEvacuacion(cantidadEvacuados) {
