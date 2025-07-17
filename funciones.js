@@ -2455,6 +2455,11 @@
                 }
             });
             
+            // ✅ NUEVA FUNCIÓN CRÍTICA: Actualizar hoja "Respuestas formulario"
+            if (personasEvacuadas.length > 0) {
+                actualizarRespuestasFormularioEvacuacion(personasEvacuadas, timestamp, sessionId);
+            }
+            
             return {
                 success: true,
                 message: `Evacuación real completada: ${personasEvacuadas.length} persona(s) evacuadas`,
@@ -2468,6 +2473,90 @@
                 message: 'Error en evacuación real: ' + error.message,
                 totalEvacuadas: 0,
                 personasEvacuadas: []
+            };
+        }
+    }
+
+    /**
+     * ✅ FUNCIÓN CRÍTICA NUEVA: Actualizar hoja "Respuestas formulario" durante evacuaciones reales
+     * Esta función actualiza la columna "Hora salida" en la hoja "Respuestas formulario"
+     */
+    function actualizarRespuestasFormularioEvacuacion(personasEvacuadas, timestamp, sessionId) {
+        try {
+            console.log(`🚨 Actualizando hoja "Respuestas formulario" para ${personasEvacuadas.length} personas evacuadas`);
+            
+            const ss = SpreadsheetApp.getActiveSpreadsheet();
+            const respuestasSheet = ss.getSheetByName('Respuestas formulario');
+            
+            if (!respuestasSheet) {
+                console.error('❌ No se encontró la hoja "Respuestas formulario"');
+                return;
+            }
+            
+            const data = respuestasSheet.getDataRange().getValues();
+            let actualizacionesRealizadas = 0;
+            
+            // Para cada persona evacuada, buscar y actualizar su registro más reciente
+            personasEvacuadas.forEach(persona => {
+                const cedulaNorm = normalizarCedula(persona.cedula).replace(/[^\w\-]/g, '');
+                
+                // Buscar la fila más reciente de esta persona que tenga entrada pero no salida
+                for (let i = data.length - 1; i >= 1; i--) {
+                    const row = data[i];
+                    const cedulaRow = (row[1] || '').toString().trim(); // Columna B (cédula)
+                    const cedulaRowNorm = normalizarCedula(cedulaRow).replace(/[^\w\-]/g, '');
+                    const horaEntrada = row[4]; // Columna E (hora entrada)
+                    const horaSalida = row[5]; // Columna F (hora salida)
+                    
+                    // Verificar si es la misma cédula y tiene entrada sin salida
+                    if ((cedulaRow === persona.cedula || cedulaRowNorm === cedulaNorm) &&
+                        horaEntrada && horaEntrada !== '' && (!horaSalida || horaSalida === '')) {
+                        
+                        // ✅ ACTUALIZAR HORA DE SALIDA
+                        const rowIndex = i + 1;
+                        respuestasSheet.getRange(rowIndex, 6).setValue(timestamp); // Columna F
+                        respuestasSheet.getRange(rowIndex, 6).setNumberFormat("HH:mm");
+                        
+                        // Agregar comentario de evacuación
+                        const comentarioAnterior = row[8] || ''; // Columna I (comentarios)
+                        const comentarioEvacuacion = `EVACUACIÓN REAL - ${Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'HH:mm')} - Session: ${sessionId}`;
+                        const comentarioCompleto = comentarioAnterior ? 
+                            `${comentarioAnterior} | ${comentarioEvacuacion}` : 
+                            comentarioEvacuacion;
+                        
+                        respuestasSheet.getRange(rowIndex, 9).setValue(comentarioCompleto); // Columna I
+                        
+                        // Aplicar formato visual de evacuación (fondo naranja)
+                        respuestasSheet.getRange(rowIndex, 6).setBackground('#ff9800');
+                        respuestasSheet.getRange(rowIndex, 9).setBackground('#fff3e0');
+                        
+                        actualizacionesRealizadas++;
+                        console.log(`✅ Actualizada hora salida para ${persona.nombre} (${persona.cedula}) en fila ${rowIndex}`);
+                        
+                        break; // Solo actualizar la primera entrada encontrada
+                    }
+                }
+            });
+            
+            console.log(`🎯 Total actualizaciones en "Respuestas formulario": ${actualizacionesRealizadas}`);
+            
+            return {
+                success: true,
+                actualizaciones: actualizacionesRealizadas,
+                mensaje: `Se actualizaron ${actualizacionesRealizadas} registros en "Respuestas formulario"`
+            };
+            
+        } catch (error) {
+            console.error('❌ Error actualizando "Respuestas formulario":', error.message);
+            logError('Error en actualizarRespuestasFormularioEvacuacion', 'ERROR', { 
+                error: error.message, 
+                sessionId: sessionId 
+            });
+            
+            return {
+                success: false,
+                error: error.message,
+                mensaje: 'Error al actualizar "Respuestas formulario"'
             };
         }
     }
