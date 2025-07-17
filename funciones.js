@@ -6134,3 +6134,132 @@
             };
         }
     }
+
+    // =====================================================
+    // FUNCIONES PARA EL FRONTEND (admin.html)
+    // =====================================================
+
+    /**
+     * ✅ FUNCIÓN PARA FRONTEND: Iniciar evacuación desde admin.html
+     */
+    function iniciarEvacuacion(esSimulacro = false, notasSimulacro = '') {
+        try {
+            console.log(`🚨 Iniciando ${esSimulacro ? 'SIMULACRO' : 'EVACUACIÓN REAL'} desde admin.html`);
+            
+            // Obtener personas que están dentro del edificio
+            const datosEvacuacion = getEvacuacionDataForClient();
+            
+            if (!datosEvacuacion.success) {
+                return {
+                    success: false,
+                    message: 'Error obteniendo datos de evacuación: ' + datosEvacuacion.message
+                };
+            }
+            
+            if (datosEvacuacion.totalDentro === 0) {
+                return {
+                    success: false,
+                    message: 'No hay personas dentro del edificio para evacuar'
+                };
+            }
+            
+            // Extraer cédulas de las personas dentro
+            const cedulas = datosEvacuacion.personasDentro.map(persona => persona.cedula);
+            
+            // Preparar parámetros
+            const parametros = {
+                cedulas: cedulas,
+                tipo: esSimulacro ? 'simulacro' : 'real',
+                operador: obtenerUsuarioActual(),
+                timestamp: new Date(),
+                notas: esSimulacro ? notasSimulacro : 'Evacuación iniciada desde panel de administración'
+            };
+            
+            // Ejecutar evacuación usando la función unificada
+            const resultado = procesarEvacuacionUnificada(parametros);
+            
+            if (resultado.success) {
+                const mensaje = esSimulacro ? 
+                    `Simulacro completado: ${resultado.totalEvacuadas} personas participaron` :
+                    `Evacuación real completada: ${resultado.totalEvacuadas} personas evacuadas`;
+                
+                return {
+                    success: true,
+                    message: mensaje,
+                    totalEvacuadas: resultado.totalEvacuadas,
+                    personasRestantes: resultado.totalPersonasRestantes,
+                    requiereActualizacionUI: resultado.requiereActualizacionUI,
+                    estadisticasActualizadas: resultado.estadisticasActualizadas
+                };
+            } else {
+                return {
+                    success: false,
+                    message: resultado.message || 'Error en la evacuación'
+                };
+            }
+            
+        } catch (error) {
+            console.error('❌ Error en iniciarEvacuacion:', error.message);
+            return {
+                success: false,
+                message: 'Error crítico en evacuación: ' + error.message
+            };
+        }
+    }
+
+    /**
+     * ✅ FUNCIÓN PARA FRONTEND: Finalizar evacuación desde admin.html
+     */
+    function finalizarEvacuacion() {
+        try {
+            console.log('🏁 Finalizando estado de evacuación desde admin.html');
+            
+            // Esta función simplemente marca el fin del "estado de evacuación"
+            // Las evacuaciones reales ya se procesaron individualmente
+            
+            // Obtener estado actualizado
+            const estadoActual = obtenerEstadoActualizadoPostEvacuacion();
+            
+            return {
+                success: true,
+                message: `Evacuación finalizada. ${estadoActual.totalPersonasDentro} personas aún en el edificio`,
+                personasRestantes: estadoActual.totalPersonasDentro,
+                personasDentro: estadoActual.personasDentro,
+                estadisticasActualizadas: estadoActual.estadisticas
+            };
+            
+        } catch (error) {
+            console.error('❌ Error en finalizarEvacuacion:', error.message);
+            return {
+                success: false,
+                message: 'Error finalizando evacuación: ' + error.message
+            };
+        }
+    }
+
+    /**
+     * ✅ FUNCIÓN PARA FRONTEND: Obtener estado actual para el admin.html
+     */
+    function obtenerEstadoEvacuacionActual() {
+        try {
+            const datosEvacuacion = getEvacuacionDataForClient();
+            const estadisticas = obtenerEstadisticasBasicas();
+            
+            return {
+                success: true,
+                totalPersonasDentro: datosEvacuacion.totalDentro || 0,
+                personasDentro: datosEvacuacion.personasDentro || [],
+                estadisticas: estadisticas,
+                timestamp: new Date().toISOString(),
+                mensaje: `${datosEvacuacion.totalDentro || 0} personas dentro del edificio`
+            };
+            
+        } catch (error) {
+            return {
+                success: false,
+                message: 'Error obteniendo estado: ' + error.message,
+                totalPersonasDentro: 0,
+                personasDentro: []
+            };
+        }
+    }

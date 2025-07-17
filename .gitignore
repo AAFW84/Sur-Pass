@@ -1,0 +1,26 @@
+# Archivos de configuración local
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Archivos temporales
+*.tmp
+*.temp
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Node modules (si usas npm)
+node_modules/
+
+# Archivos de respaldo
+*.bak
+*~

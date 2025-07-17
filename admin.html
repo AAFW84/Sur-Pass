@@ -1250,6 +1250,11 @@
                         mostrarNotificacion(result.message);
                         if (!isSimulacro) {
                             document.getElementById('evacuationStatus').textContent = 'Activa (Real)';
+                            
+                            // 🔧 NUEVO: Actualizar estadísticas en tiempo real después de evacuación real
+                            if (result.requiereActualizacionUI) {
+                                actualizarEstadisticasPostEvacuacion();
+                            }
                         }
                     } else {
                         mostrarNotificacion('Error: ' + result.message, 'error');
@@ -1271,6 +1276,9 @@
                     if (result.success) {
                         mostrarNotificacion(result.message);
                         document.getElementById('evacuationStatus').textContent = 'Inactiva';
+                        
+                        // 🔧 NUEVO: Actualizar estadísticas después de finalizar
+                        actualizarEstadisticasPostEvacuacion();
                     } else {
                         mostrarNotificacion('Error: ' + result.message, 'error');
                     }
@@ -1293,6 +1301,81 @@
                     document.getElementById('evacuationStatus').textContent = 'Error al cargar';
                 })
                 .getEvacuationStatus();
+        }
+
+        // =====================================================
+        // 🔧 NUEVA FUNCIÓN: Actualizar estadísticas después de evacuación real
+        // =====================================================
+        function actualizarEstadisticasPostEvacuacion() {
+            console.log('🔄 Actualizando estadísticas post-evacuación...');
+            
+            google.script.run
+                .withSuccessHandler(function(estado) {
+                    if (estado.success) {
+                        console.log('✅ Estado actualizado:', estado);
+                        
+                        // Actualizar elementos de la UI
+                        if (document.getElementById('evacuationStatus')) {
+                            document.getElementById('evacuationStatus').textContent = 
+                                `Actualizada - ${estado.totalPersonasDentro} personas dentro`;
+                        }
+                        
+                        // Mostrar notificación con el estado actualizado
+                        mostrarNotificacion(
+                            `Estado actualizado: ${estado.totalPersonasDentro} personas dentro del edificio`,
+                            'success'
+                        );
+                        
+                        // Si existe un elemento para mostrar estadísticas, actualizarlo
+                        actualizarDisplayEstadisticas(estado);
+                        
+                    } else {
+                        console.error('❌ Error actualizando estado:', estado.mensaje);
+                        mostrarNotificacion('Error actualizando estado: ' + estado.mensaje, 'error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('❌ Error en actualización:', error);
+                    mostrarNotificacion('Error en actualización post-evacuación: ' + error.message, 'error');
+                })
+                .obtenerEstadoActualizadoPostEvacuacion();
+        }
+
+        // =====================================================
+        // 🔧 NUEVA FUNCIÓN: Actualizar display de estadísticas en la UI
+        // =====================================================
+        function actualizarDisplayEstadisticas(estado) {
+            try {
+                // Actualizar contadores si existen en la UI
+                const elementos = {
+                    'totalPersonasDentro': estado.totalPersonasDentro,
+                    'totalEntradas': estado.estadisticas?.entradas,
+                    'totalSalidas': estado.estadisticas?.salidas,
+                    'totalAccesos': estado.estadisticas?.totalAccesos
+                };
+                
+                Object.keys(elementos).forEach(elementId => {
+                    const elemento = document.getElementById(elementId);
+                    if (elemento && elementos[elementId] !== undefined) {
+                        elemento.textContent = elementos[elementId];
+                        
+                        // Agregar efecto visual de actualización
+                        elemento.style.backgroundColor = '#4CAF50';
+                        elemento.style.color = 'white';
+                        elemento.style.transition = 'all 0.3s ease';
+                        
+                        setTimeout(() => {
+                            elemento.style.backgroundColor = '';
+                            elemento.style.color = '';
+                        }, 2000);
+                    }
+                });
+                
+                console.log('✅ Display de estadísticas actualizado');
+                
+            } catch (error) {
+                console.error('❌ Error actualizando display:', error);
+            }
         }
 
         // =====================================================
