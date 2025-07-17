@@ -2338,6 +2338,12 @@
 
             // ✅ OBTENER LISTA ACTUALIZADA DE PERSONAS DENTRO DESPUÉS DE LA OPERACIÓN
             // Esto es crucial para el cliente, para mostrar los "faltantes" o el estado final
+            
+            // 🔧 NUEVO: Forzar recálculo después de evacuaciones reales
+            if (tipo === 'real' && resultadoProcesamiento.success) {
+                forzarRecalculoDespuesEvacuacion();
+            }
+            
             const personasDentroActualizadas = getEvacuacionDataForClient().personasDentro;
 
             // ✅ RESULTADO FINAL
@@ -2354,7 +2360,12 @@
                 sessionId: sessionId, 
                 tiempoMs: tiempoTotal, 
                 tipo: tipo, 
-                personasDentroActualizadas: personasDentroActualizadas // Devolver al cliente para actualizar la UI
+                personasDentroActualizadas: personasDentroActualizadas, // Devolver al cliente para actualizar la UI
+                // 🔧 NUEVOS CAMPOS PARA FRONTEND
+                requiereActualizacionUI: tipo === 'real', // El frontend debe actualizar estadísticas si es evacuación real
+                totalPersonasRestantes: personasDentroActualizadas.length,
+                estadisticasActualizadas: tipo === 'real' ? obtenerEstadisticasBasicas() : null,
+                timestampActualizacion: new Date().toISOString()
             };
 
         } catch (error) {
@@ -2371,7 +2382,12 @@
                 personasEvacuadas: [], 
                 sessionId: sessionId, 
                 tipo: parametros?.tipo || 'desconocido',
-                personasDentroActualizadas: getEvacuacionDataForClient().personasDentro // Intentar obtener el estado actual incluso con error
+                personasDentroActualizadas: getEvacuacionDataForClient().personasDentro, // Intentar obtener el estado actual incluso con error
+                // 🔧 NUEVOS CAMPOS PARA FRONTEND (incluso en error)
+                requiereActualizacionUI: false,
+                totalPersonasRestantes: 0,
+                estadisticasActualizadas: null,
+                timestampActualizacion: new Date().toISOString()
             };
         }
     }
@@ -2557,6 +2573,174 @@
                 success: false,
                 error: error.message,
                 mensaje: 'Error al actualizar "Respuestas formulario"'
+            };
+        }
+    }
+
+    /**
+     * ✅ FUNCIÓN CRÍTICA NUEVA: Forzar recálculo después de evacuaciones reales
+     * Esta función limpia caches y fuerza recálculo de estadísticas
+     */
+    function forzarRecalculoDespuesEvacuacion() {
+        try {
+            console.log('🔄 Forzando recálculo del sistema después de evacuación real...');
+            
+            // 1. Limpiar caché de Google Apps Script si existe
+            if (typeof CacheService !== 'undefined') {
+                try {
+                    CacheService.getScriptCache().removeAll();
+                    console.log('✅ Cache del script limpiado');
+                } catch (cacheError) {
+                    console.log('⚠️ No se pudo limpiar cache:', cacheError.message);
+                }
+            }
+            
+            // 2. Forzar recálculo de fórmulas en hojas
+            const ss = SpreadsheetApp.getActiveSpreadsheet();
+            try {
+                // Forzar recálculo global
+                SpreadsheetApp.flush();
+                console.log('✅ Flush de hojas ejecutado');
+                
+                // Verificar hojas críticas
+                const hojasImportantes = ['Historial', 'Respuestas formulario', 'Configuración'];
+                hojasImportantes.forEach(nombreHoja => {
+                    const hoja = ss.getSheetByName(nombreHoja);
+                    if (hoja) {
+                        // Forzar recálculo tocando una celda vacía
+                        try {
+                            const ultimaFila = hoja.getLastRow();
+                            const ultimaColumna = hoja.getLastColumn();
+                            
+                            // Tocar una celda para forzar recálculo
+                            const celda = hoja.getRange(Math.max(1, ultimaFila), Math.max(1, ultimaColumna));
+                            const valorOriginal = celda.getValue();
+                            celda.setValue(valorOriginal); // Reassign mismo valor para trigger recálculo
+                            
+                            console.log(`✅ Recálculo forzado en hoja: ${nombreHoja}`);
+                        } catch (hojaError) {
+                            console.log(`⚠️ No se pudo forzar recálculo en ${nombreHoja}:`, hojaError.message);
+                        }
+                    }
+                });
+                
+            } catch (flushError) {
+                console.log('⚠️ Error en flush:', flushError.message);
+            }
+            
+            // 3. Limpiar variables de memoria si existen
+            try {
+                // Reset de cualquier variable global de cache
+                if (typeof CACHE_PERSONAS_DENTRO !== 'undefined') {
+                    CACHE_PERSONAS_DENTRO = null;
+                }
+                if (typeof CACHE_ESTADISTICAS !== 'undefined') {
+                    CACHE_ESTADISTICAS = null;
+                }
+                console.log('✅ Variables de cache resetadas');
+            } catch (varError) {
+                console.log('⚠️ No se pudieron resetear variables:', varError.message);
+            }
+            
+            // 4. Forzar nuevo cálculo de personas dentro
+            try {
+                const nuevosResultados = getEvacuacionDataForClient();
+                console.log(`🔍 Recálculo forzado: ${nuevosResultados.totalDentro} personas dentro`);
+                
+                return {
+                    success: true,
+                    mensaje: 'Recálculo forzado completado',
+                    personasDentro: nuevosResultados.totalDentro,
+                    timestamp: new Date().toISOString()
+                };
+                
+            } catch (recalculoError) {
+                console.error('❌ Error en recálculo forzado:', recalculoError.message);
+                return {
+                    success: false,
+                    mensaje: 'Error en recálculo forzado: ' + recalculoError.message
+                };
+            }
+            
+        } catch (error) {
+            console.error('❌ Error crítico en forzarRecalculoDespuesEvacuacion:', error.message);
+            logError('Error en forzarRecalculoDespuesEvacuacion', 'ERROR', { 
+                error: error.message 
+            });
+            
+            return {
+                success: false,
+                mensaje: 'Error crítico en recálculo: ' + error.message
+            };
+        }
+    }
+
+    /**
+     * ✅ FUNCIÓN NUEVA: Obtener estado actualizado para el frontend después de evacuaciones
+     * Esta función devuelve toda la información que el frontend necesita actualizar
+     */
+    function obtenerEstadoActualizadoPostEvacuacion() {
+        try {
+            console.log('🔄 Obteniendo estado actualizado post-evacuación...');
+            
+            // 1. Forzar recálculo
+            const resultadoRecalculo = forzarRecalculoDespuesEvacuacion();
+            
+            // 2. Obtener datos actualizados
+            const datosEvacuacion = getEvacuacionDataForClient();
+            const estadisticas = obtenerEstadisticasBasicas();
+            
+            // 3. Preparar respuesta completa para el frontend
+            const estadoActualizado = {
+                success: true,
+                timestamp: new Date().toISOString(),
+                
+                // Personas actualmente dentro
+                personasDentro: datosEvacuacion.personasDentro || [],
+                totalPersonasDentro: datosEvacuacion.totalDentro || 0,
+                
+                // Estadísticas actualizadas
+                estadisticas: {
+                    entradas: estadisticas.entradas || 0,
+                    salidas: estadisticas.salidas || 0,
+                    dentroActualmente: datosEvacuacion.totalDentro || 0,
+                    totalAccesos: (estadisticas.entradas || 0) + (estadisticas.salidas || 0)
+                },
+                
+                // Información de recálculo
+                recalculoForzado: resultadoRecalculo.success,
+                mensajeRecalculo: resultadoRecalculo.mensaje,
+                
+                // Mensaje para el usuario
+                mensaje: `Estado actualizado: ${datosEvacuacion.totalDentro || 0} personas dentro del edificio`,
+                
+                // Indicadores para el frontend
+                requiereRefreshUI: true,
+                requiereActualizacionGraficos: true
+            };
+            
+            console.log(`✅ Estado actualizado obtenido: ${estadoActualizado.totalPersonasDentro} personas dentro`);
+            return estadoActualizado;
+            
+        } catch (error) {
+            console.error('❌ Error obteniendo estado actualizado:', error.message);
+            
+            return {
+                success: false,
+                timestamp: new Date().toISOString(),
+                mensaje: 'Error actualizando estado: ' + error.message,
+                personasDentro: [],
+                totalPersonasDentro: 0,
+                estadisticas: {
+                    entradas: 0,
+                    salidas: 0,
+                    dentroActualmente: 0,
+                    totalAccesos: 0
+                },
+                recalculoForzado: false,
+                mensajeRecalculo: 'Error en recálculo',
+                requiereRefreshUI: true,
+                requiereActualizacionGraficos: true
             };
         }
     }
