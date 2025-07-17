@@ -5524,7 +5524,7 @@ function ejecutarEvacuacionConfirmada() {
                         showCustomNotification(`✅ Evacuación REAL completada: ${resultado.message}`, 'success');
                         
                         // 🔥 ACTUALIZAR INMEDIATAMENTE LA INTERFAZ LOCAL
-                        actualizarInterfazPostEvacuacionReal(personasSeleccionadasEvacuacion);
+                        actualizarInterfazPostEvacuacionReal(personasSeleccionadasEvacuacion, resultado);
                         
                         // Resetear selecciones
                         personasSeleccionadasEvacuacion = [];
@@ -5593,9 +5593,11 @@ function ocultarLoadingEvacuacion() {
 /**
  * Actualiza la interfaz inmediatamente después de una evacuación real exitosa
  * @param {Array} cedulasEvacuadas - Array de cédulas de personas evacuadas
+ * @param {Object} resultado - Resultado del servidor con datos actualizados
  */
-function actualizarInterfazPostEvacuacionReal(cedulasEvacuadas) {
+function actualizarInterfazPostEvacuacionReal(cedulasEvacuadas, resultado) {
     console.log('🔄 Actualizando interfaz post-evacuación real para:', cedulasEvacuadas);
+    console.log('📊 Datos del servidor:', resultado);
     
     // 1. Remover personas evacuadas de los datos locales
     if (evacuationData && evacuationData.personasDentro) {
@@ -5606,15 +5608,22 @@ function actualizarInterfazPostEvacuacionReal(cedulasEvacuadas) {
         const personasRestantes = evacuationData.personasDentro.length;
         console.log(`👥 Personas removidas: ${personasOriginales - personasRestantes}, Restantes: ${personasRestantes}`);
         
-        // 2. Actualizar contador principal
+        // 2. Actualizar contador principal con datos del servidor si están disponibles
         const totalPersonasElement = document.getElementById('totalPersonasDentro');
         if (totalPersonasElement) {
-            totalPersonasElement.textContent = personasRestantes;
+            const totalReal = resultado.totalPersonasRestantes !== undefined ? resultado.totalPersonasRestantes : personasRestantes;
+            totalPersonasElement.textContent = totalReal;
             totalPersonasElement.style.animation = 'countUp 0.5s ease-out';
         }
         
         // 3. Re-renderizar la lista sin las personas evacuadas
-        renderEvacuationListModern(evacuationData.personasDentro);
+        // Usar datos del servidor si están disponibles
+        if (resultado.personasDentroActualizadas && resultado.personasDentroActualizadas.length >= 0) {
+            renderEvacuationListModern(resultado.personasDentroActualizadas);
+            evacuationData.personasDentro = resultado.personasDentroActualizadas; // Sincronizar con servidor
+        } else {
+            renderEvacuationListModern(evacuationData.personasDentro);
+        }
         
         // 4. Resetear formulario de selección
         resetearSeleccionTipo();
@@ -5625,8 +5634,14 @@ function actualizarInterfazPostEvacuacionReal(cedulasEvacuadas) {
         // 6. Mostrar feedback visual de evacuación completada
         mostrarFeedbackEvacuacionReal(cedulasEvacuadas.length);
         
-        // 7. Actualizar estadísticas inmediatamente
-        actualizarEstadisticasPostEvacuacion(cedulasEvacuadas.length);
+        // 7. Actualizar estadísticas INMEDIATAMENTE con datos del servidor
+        if (resultado.estadisticasActualizadas) {
+            console.log('📈 Actualizando estadísticas con datos del servidor:', resultado.estadisticasActualizadas);
+            actualizarEstadisticasConDatos(resultado.estadisticasActualizadas);
+        } else {
+            // Fallback: actualizar usando el método tradicional
+            actualizarEstadisticasPostEvacuacion(cedulasEvacuadas.length);
+        }
     }
 }
 
@@ -5634,6 +5649,43 @@ function actualizarInterfazPostEvacuacionReal(cedulasEvacuadas) {
  * Actualiza las estadísticas inmediatamente después de una evacuación real
  * @param {number} cantidadEvacuados - Número de personas evacuadas
  */
+/**
+ * Actualiza las estadísticas con datos específicos del servidor
+ * @param {Object} estadisticas - Datos de estadísticas del servidor
+ */
+function actualizarEstadisticasConDatos(estadisticas) {
+    console.log('📊 Actualizando estadísticas con datos específicos:', estadisticas);
+    
+    if (!mostrarEstadisticas) return;
+    
+    // Actualizar contadores directamente con los datos del servidor
+    if (entradasLiveSpan && estadisticas.entradas !== undefined) {
+        entradasLiveSpan.textContent = estadisticas.entradas;
+        entradasLiveSpan.style.animation = 'countUp 0.5s ease';
+        setTimeout(() => {
+            entradasLiveSpan.style.animation = '';
+        }, 500);
+    }
+    
+    if (salidasLiveSpan && estadisticas.salidas !== undefined) {
+        salidasLiveSpan.textContent = estadisticas.salidas;
+        salidasLiveSpan.style.animation = 'countUp 0.5s ease';
+        setTimeout(() => {
+            salidasLiveSpan.style.animation = '';
+        }, 500);
+    }
+    
+    // Actualizar gráfica
+    if (estadisticas.entradas !== undefined && estadisticas.salidas !== undefined) {
+        drawMiniChart(estadisticas.entradas, estadisticas.salidas);
+    }
+    
+    // Programar una actualización completa después de un momento para sincronizar
+    setTimeout(() => {
+        updateStatsPanel();
+    }, 1000);
+}
+
 function actualizarEstadisticasPostEvacuacion(cantidadEvacuados) {
     // Actualizar contador de salidas en las estadísticas
     if (salidasLiveSpan) {
